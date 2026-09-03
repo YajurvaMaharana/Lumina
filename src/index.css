@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme {
+  --color-stone-50: #05070A;
+  --color-stone-100: #1a1d24;
+  --color-stone-200: rgba(255, 255, 255, 0.1);
+  --color-stone-300: rgba(255, 255, 255, 0.2);
+  --color-stone-400: rgba(255, 255, 255, 0.4);
+  --color-stone-500: rgba(255, 255, 255, 0.6);
+  --color-stone-600: rgba(255, 255, 255, 0.8);
+  --color-stone-700: rgba(255, 255, 255, 0.9);
+  --color-stone-800: #E0E6ED;
+  --color-stone-900: #ffffff;
+}
+
+@layer utilities {
+  .atmosphere {
+    background: radial-gradient(circle at 70% 20%, #1e1b4b 0%, transparent 60%), radial-gradient(circle at 20% 80%, #4c1d95 0%, transparent 50%);
+    filter: blur(80px);
+    opacity: 0.4;
+  }
+  .glass {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .serif {
+    font-family: 'Georgia', serif;
+  }
+  .glow-text {
+    text-shadow: 0 0 15px rgba(167, 139, 250, 0.4);
+  }
+  .reflection-mask {
+    mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
+  }
+}
