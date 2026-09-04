@@ -114,10 +114,12 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
       setIsSaving(true);
       await saveJournal(user.uid, updatedJournal);
       setIsSaving(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to save user message", err);
-      setError("Failed to save message. Please check your connection.");
+      setError(err.message || "Failed to save message. Please check your connection.");
       setIsSaving(false);
+      setIsTyping(false);
+      return; // Stop execution if encryption fails
     }
 
     try {
@@ -164,7 +166,12 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
       
       // Save AI response to Firestore
       setIsSaving(true);
-      await saveJournal(user.uid, finalJournal);
+      try {
+        await saveJournal(user.uid, finalJournal);
+      } catch (err: any) {
+        console.error("Failed to save AI response", err);
+        setError(err.message || "Failed to save AI response.");
+      }
       setIsSaving(false);
 
     } catch (err) {

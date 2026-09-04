@@ -3,18 +3,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import JournalView from './components/JournalView';
 import AdminDashboard from './components/AdminDashboard';
+import PassphrasePrompt from './components/PassphrasePrompt';
+import { getPassword, clearPassword } from './lib/crypto';
 import { Loader2 } from 'lucide-react';
 
 function AppContent() {
   const { user, loading } = useAuth();
   const [view, setView] = useState<'dashboard' | 'admin' | 'journal'>('dashboard');
   const [selectedJournalId, setSelectedJournalId] = useState<string | null>(null);
+  const [hasPassword, setHasPassword] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      clearPassword();
+      setHasPassword(false);
+    } else {
+      setHasPassword(!!getPassword());
+    }
+  }, [user]);
 
   if (loading) {
     return (
@@ -26,6 +38,10 @@ function AppContent() {
 
   if (!user) {
     return <Login />;
+  }
+
+  if (!hasPassword) {
+    return <PassphrasePrompt onSet={() => setHasPassword(true)} />;
   }
 
   if (view === 'admin') {

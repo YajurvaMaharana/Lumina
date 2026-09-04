@@ -7,6 +7,13 @@ export interface Journal {
   createdAt: number;
   updatedAt: number;
   messages: Message[];
+  
+  // Encrypted fields (when saved to Firestore)
+  encryptedPayload?: {
+    ciphertext: string;
+    salt: string;
+    iv: string;
+  };
 }
 
 export interface Message {

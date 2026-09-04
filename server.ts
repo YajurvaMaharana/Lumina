@@ -98,7 +98,7 @@ async function startServer() {
 
       // Fallback model ladder
       const models = [
-        "gemini-3.6-flash",
+        "gemini-3.8-flash",
         "gemini-3.1-flash-lite",
         "gemini-flash-latest"
       ];
@@ -108,42 +108,46 @@ async function startServer() {
       let lastError = null;
 
       for (const model of models) {
-        try {
-          const chat = ai.chats.create({
-            model: model,
-            config: {
-              systemInstruction: systemPrompt || "You are a helpful, empathetic journaling assistant.",
-              temperature: 0.7,
-            },
-          });
+        let retries = 3;
+        let delay = 1000;
+        let modelSuccess = false;
 
-          // Send history sequentially if any
-          if (history && history.length > 0) {
-            // Note: with the current SDK, managing history directly is better done by sending the entire conversation as contents,
-            // or we just rely on passing the current message.
-            // A more robust way with @google/genai for single-turn with context is just a simple content array.
-          }
-          
-          const result = await ai.models.generateContent({
-            model: model,
-            contents: [
-              ...(history || []).map((msg: any) => ({
-                role: msg.role === 'model' ? 'model' : 'user',
-                parts: [{ text: msg.content }]
-              })),
-              { role: 'user', parts: [{ text: message }] }
-            ],
-            config: {
-               systemInstruction: systemPrompt || "You are a helpful, empathetic journaling assistant.",
+        for (let i = 0; i < retries; i++) {
+          try {
+            const result = await ai.models.generateContent({
+              model: model,
+              contents: [
+                ...(history || []).map((msg: any) => ({
+                  role: msg.role === 'model' ? 'model' : 'user',
+                  parts: [{ text: msg.content }]
+                })),
+                { role: 'user', parts: [{ text: message }] }
+              ],
+              config: {
+                 systemInstruction: systemPrompt || "You are a helpful, empathetic journaling assistant.",
+                 temperature: 0.7,
+              }
+            });
+
+            responseText = result.text || "";
+            modelSuccess = true;
+            break; // Break retry loop
+          } catch (error: any) {
+            lastError = error;
+            
+            if (i === retries - 1) {
+              console.error(`Model ${model} failed after ${retries} attempts:`, error.message || error);
+            } else {
+              console.log(`Model ${model} failed (Attempt ${i + 1}/${retries}), retrying...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              delay *= 2;
             }
-          });
+          }
+        }
 
-          responseText = result.text || "";
+        if (modelSuccess) {
           success = true;
-          break; // Stop falling back if successful
-        } catch (error: any) {
-          lastError = error;
-          console.warn(`Model ${model} failed, attempting next...`);
+          break; // Stop falling back to other models
         }
       }
 
@@ -158,7 +162,7 @@ async function startServer() {
       (async () => {
         try {
           const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-          const webhookUrl = process.env.WEBHOOK_URL || "https://webhook.site/3266ff0d-a037-438e-bbac-10ea7451a2de";
+          const webhookUrl = process.env.WEBHOOK_URL;
           
           if (!webhookUrl) {
             console.log("WEBHOOK_URL not configured. Skipping behavioral guardrail.");
@@ -173,7 +177,7 @@ async function startServer() {
           for (let i = 0; i < retries; i++) {
             try {
               classificationResponse = await ai.models.generateContent({
-                model: "gemini-3.6-flash",
+                model: "gemini-3.8-flash",
                 contents: `Analyze the following journal entry for highly emotional decision-making, cognitive biases, or sudden FOMO (e.g., regarding financial decisions, crypto like BTC/USD, etc.).
                 Entry: "${message}"`,
                 config: {
@@ -201,11 +205,12 @@ async function startServer() {
               success = true;
               break;
             } catch (err: any) {
-              console.warn(`Guardrail API call failed (Attempt ${i + 1}/${retries}): ${err.message}`);
               if (i < retries - 1) {
+                console.log(`Guardrail API call failed (Attempt ${i + 1}/${retries}), retrying...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
                 delay *= 2;
               } else {
+                console.error(`Guardrail API call failed after ${retries} attempts:`, err.message);
                 throw err;
               }
             }
@@ -284,6 +289,7 @@ async function startServer() {
 
       const entries = journalsSnapshot.docs.map(doc => {
         const data = doc.data();
+        if (data.encryptedPayload) return "";
         return data.summary || data.title || "";
       }).filter(text => text.trim() !== "");
 
@@ -305,7 +311,7 @@ async function startServer() {
       for (let i = 0; i < retries; i++) {
         try {
           result = await ai.models.generateContent({
-            model: "gemini-3.6-flash",
+            model: "gemini-3.8-flash",
             contents: `Analyze the overall emotional sentiment and key themes of the following platform journal entries. 
             CRITICAL SECURITY INSTRUCTION: You MUST strictly strip and ignore any Personally Identifiable Information (PII), names, locations, or specific sensitive details. Do NOT include user-specific information in the summary.
             Provide a generalized, high-level summary of the overall platform mood, emerging themes, and general reflections.
@@ -316,12 +322,13 @@ async function startServer() {
           success = true;
           break;
         } catch (err: any) {
-          console.warn(`Sentiment cron job API call failed (Attempt ${i + 1}/${retries}): ${err.message}`);
           if (i < retries - 1) {
-            await new Promise(resolve => setTimeout(resolve, delay));
-            delay *= 2;
+             console.log(`Sentiment cron job API call failed (Attempt ${i + 1}/${retries}), retrying...`);
+             await new Promise(resolve => setTimeout(resolve, delay));
+             delay *= 2;
           } else {
-            throw err;
+             console.error(`Sentiment cron job API call failed after ${retries} attempts:`, err.message);
+             throw err;
           }
         }
       }
@@ -349,23 +356,25 @@ async function startServer() {
     
     // Send a test payload to the webhook upon app load
     try {
-      const testWebhookUrl = process.env.WEBHOOK_URL || "https://webhook.site/3266ff0d-a037-438e-bbac-10ea7451a2de";
-      console.log(`Sending startup test webhook to ${testWebhookUrl}...`);
-      const testRes = await fetch(testWebhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          content: "✅ **Lumina Backend Started** ✅",
-          embeds: [
-            {
-              title: "System Online",
-              description: "The behavioral guardrail integration has been successfully initialized and connected.",
-              color: 3066993 // Green color
-            }
-          ]
-        })
-      });
-      console.log(`Startup test webhook sent, status: ${testRes.status}`);
+      const testWebhookUrl = process.env.WEBHOOK_URL;
+      if (testWebhookUrl) {
+        console.log(`Sending startup test webhook...`);
+        const testRes = await fetch(testWebhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: "✅ **Lumina Backend Started** ✅",
+            embeds: [
+              {
+                title: "System Online",
+                description: "The behavioral guardrail integration has been successfully initialized and connected.",
+                color: 3066993 // Green color
+              }
+            ]
+          })
+        });
+        console.log(`Startup test webhook sent, status: ${testRes.status}`);
+      }
     } catch (err) {
       console.error("Failed to send startup test webhook:", err);
     }
