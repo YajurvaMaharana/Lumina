@@ -1,6 +1,6 @@
-import { collection, doc, getDocs, getDoc, setDoc, query, orderBy } from 'firebase/firestore';
+import { collection, doc, getDocs, getDoc, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { db } from './firebase';
-import { Journal } from '../types';
+import { Journal, IntegrationSettings, TradeRecord, WeeklyPerformanceReport } from '../types';
 import { getPassword, encryptData, decryptData } from './crypto';
 
 const processJournalDoc = async (data: any, id: string): Promise<Journal> => {
@@ -54,8 +54,8 @@ export const saveJournal = async (userId: string, journal: Journal): Promise<voi
     throw new Error("Zero-Knowledge password is required to save.");
   }
 
-  const { id, title, summary, location, messages, ...baseData } = journal;
-  const sensitiveData = { title, summary, location, messages };
+  const { id, title, summary, location, messages, emotions, cbtDistortions, userFeedback, ...baseData } = journal;
+  const sensitiveData = { title, summary, location, messages, emotions, cbtDistortions, userFeedback };
   
   const encryptedPayload = await encryptData(sensitiveData, password);
   
@@ -69,4 +69,74 @@ export const saveJournal = async (userId: string, journal: Journal): Promise<voi
     messages: [] // clear plaintext
   }, { merge: true });
 };
+
+// --- Integration Settings ---
+export const getIntegrationSettings = async (userId: string): Promise<IntegrationSettings | null> => {
+  const docRef = doc(db, 'users', userId, 'integrations', 'config');
+  const snapshot = await getDoc(docRef);
+  if (snapshot.exists()) {
+    return snapshot.data() as IntegrationSettings;
+  }
+  return {
+    github: {
+      enabled: false,
+      username: '',
+      status: 'disconnected'
+    },
+    trading: {
+      enabled: false,
+      provider: 'manual',
+      autoSync: true
+    },
+    discordWebhook: {
+      enabled: false,
+      webhookUrl: ''
+    },
+    privacyAcknowledged: false
+  };
+};
+
+export const saveIntegrationSettings = async (userId: string, settings: IntegrationSettings): Promise<void> => {
+  const docRef = doc(db, 'users', userId, 'integrations', 'config');
+  await setDoc(docRef, {
+    ...settings,
+    updatedAt: Date.now()
+  }, { merge: true });
+};
+
+// --- Trade Records ---
+export const getTrades = async (userId: string): Promise<TradeRecord[]> => {
+  const q = query(
+    collection(db, 'users', userId, 'trades'),
+    orderBy('timestamp', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TradeRecord));
+};
+
+export const saveTrade = async (userId: string, trade: TradeRecord): Promise<void> => {
+  const docRef = doc(db, 'users', userId, 'trades', trade.id);
+  await setDoc(docRef, trade, { merge: true });
+};
+
+export const deleteTrade = async (userId: string, tradeId: string): Promise<void> => {
+  const docRef = doc(db, 'users', userId, 'trades', tradeId);
+  await deleteDoc(docRef);
+};
+
+// --- Weekly Performance Reports ---
+export const getWeeklyReports = async (userId: string): Promise<WeeklyPerformanceReport[]> => {
+  const q = query(
+    collection(db, 'users', userId, 'reports'),
+    orderBy('generatedAt', 'desc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WeeklyPerformanceReport));
+};
+
+export const saveWeeklyReport = async (userId: string, report: WeeklyPerformanceReport): Promise<void> => {
+  const docRef = doc(db, 'users', userId, 'reports', report.id);
+  await setDoc(docRef, report, { merge: true });
+};
+
 

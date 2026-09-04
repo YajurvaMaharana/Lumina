@@ -2,7 +2,8 @@
   "name": "AI Journal",
   "description": "A private, AI-powered journaling application using Gemini and Firestore.",
   "requestFramePermissions": [
-    "geolocation"
+    "geolocation",
+    "microphone"
   ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
