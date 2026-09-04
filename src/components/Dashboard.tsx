@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Book, LogOut, ChevronRight, Loader2, Sparkles, ShieldAlert, Brain, LayoutGrid, Activity, Palette } from 'lucide-react';
+import { Plus, Book, LogOut, ChevronRight, Loader2, Sparkles, ShieldAlert, Brain, LayoutGrid, Activity, Palette, Bot, GitPullRequest } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { getJournals } from '../lib/db';
 import { Journal } from '../types';
@@ -7,6 +7,8 @@ import { logout } from '../lib/firebase';
 import PatternInsightsSection from './PatternInsightsSection';
 import CognitiveSyncSection from './CognitiveSyncSection';
 import ArtworkVisualizerSection from './ArtworkVisualizerSection';
+import AutonomousAgentSection from './AutonomousAgentSection';
+import ProjectManagementSection from './ProjectManagementSection';
 
 interface DashboardProps {
   onSelectJournal: (journalId: string | 'new') => void;
@@ -17,7 +19,7 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin }: DashboardPro
   const { user, isAdmin } = useAuth();
   const [journals, setJournals] = useState<Journal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'entries' | 'visualizer' | 'insights' | 'sync'>('entries');
+  const [activeTab, setActiveTab] = useState<'entries' | 'agent' | 'pm' | 'visualizer' | 'insights' | 'sync'>('entries');
 
   useEffect(() => {
     if (user) {
@@ -96,6 +98,30 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin }: DashboardPro
               </button>
 
               <button
+                onClick={() => setActiveTab('agent')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === 'agent'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-950'
+                    : 'text-white/50 hover:text-white/80'
+                }`}
+              >
+                <Bot className="w-3.5 h-3.5 text-indigo-300" />
+                <span>Autonomous Agent</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('pm')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === 'pm'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-950'
+                    : 'text-white/50 hover:text-white/80'
+                }`}
+              >
+                <GitPullRequest className="w-3.5 h-3.5 text-cyan-300" />
+                <span>PM & GitHub Dispatcher</span>
+              </button>
+
+              <button
                 onClick={() => setActiveTab('visualizer')}
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
                   activeTab === 'visualizer'
@@ -145,6 +171,10 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin }: DashboardPro
             <div className="flex items-center justify-center py-20 text-white/40">
               <Loader2 className="w-8 h-8 animate-spin text-violet-400" />
             </div>
+          ) : activeTab === 'agent' ? (
+            <AutonomousAgentSection journalsCount={journals.length} />
+          ) : activeTab === 'pm' ? (
+            <ProjectManagementSection journals={journals} />
           ) : activeTab === 'visualizer' ? (
             <ArtworkVisualizerSection journals={journals} onSelectJournal={(id) => onSelectJournal(id)} />
           ) : activeTab === 'sync' ? (

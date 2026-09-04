@@ -53,6 +53,8 @@ export interface Journal {
   emotions?: EmotionTag[];
   cbtDistortions?: CBTDistortion[];
   artwork?: JournalArtwork;
+  invalidation?: string;
+  emotionalState?: string;
   userFeedback?: {
     isAccurate: boolean;
     notes?: string;
@@ -156,6 +158,116 @@ export interface WeeklyPerformanceReport {
   comprehensiveSummary: string;
   actionableRecommendations: string[];
   webhookDelivered: boolean;
+}
+
+export interface CognitiveBottleneck {
+  id: string;
+  title: string;
+  category: 'Emotional Bias' | 'Habit Friction' | 'Execution Drift' | 'Burnout / Fatigue' | 'Cognitive Distortion';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  frequency: number; // how many times observed in window
+  patternDescription: string;
+  rootCause: string;
+  actionableIntervention: string;
+  firstDetectedAt: number;
+  resolvedStatus: 'active' | 'improving' | 'resolved';
+}
+
+export interface HabitScoreItem {
+  habit: string;
+  category: 'Mindfulness & Grounding' | 'Discipline & Execution' | 'Deep Work & Focus' | 'Cognitive Reframing' | 'Emotional Regulation';
+  score: number; // 0 - 100
+  previousScore?: number;
+  delta: number; // e.g. +12, -5
+  streakDays: number;
+  status: 'optimal' | 'stable' | 'at_risk' | 'breakthrough';
+  insight: string;
+}
+
+export interface HabitEvolutionScorecard {
+  id: string;
+  userId: string;
+  weekStartDate: string;
+  weekEndDate: string;
+  generatedAt: number;
+  overallConsistencyScore: number; // 0 - 100
+  growthVelocity: '+Accelerating' | '+Steady' | '~Neutral' | '-Stagnant' | '-Decelerating';
+  habitScores: HabitScoreItem[];
+  cognitiveBottlenecks: CognitiveBottleneck[];
+  executiveSummary: string;
+  breakthroughs: string[];
+  recommendedMicroHabits: string[];
+  deliveryChannelsSent: Array<'in_app' | 'discord' | 'email' | 'telegram'>;
+  isRead: boolean;
+}
+
+export interface AutonomousAgentSettings {
+  enabled: boolean; // Opt-in toggle: "Enable Autonomous Background Synthesis"
+  isPaused: boolean; // "Pause insights" for sensitive periods or vacation
+  pauseUntil?: number | null; // Optional timestamp when pause automatically resumes
+  scheduleCron: string; // Default: "0 8 * * 0" (Every Sunday 8:00 AM)
+  deliveryChannels: {
+    inApp: boolean;
+    discord: boolean;
+    email: boolean;
+    telegram: boolean;
+  };
+  discordWebhookUrl?: string;
+  emailRecipient?: string;
+  telegramChatId?: string;
+  minEntriesRequired: number; // e.g. 2 entries per week to run
+  lastExecutedAt?: number;
+  lastScorecardId?: string;
+  cachedAnalysisHash?: string;
+  executionHistory: Array<{
+    timestamp: number;
+    status: 'success' | 'skipped_no_entries' | 'skipped_paused' | 'error';
+    summary?: string;
+    deliveredChannels?: string[];
+  }>;
+}
+
+export interface DevTask {
+  id: string;
+  title: string;
+  description: string;
+  acceptanceCriteria: string[];
+  suggestedDataModels?: string[];
+  suggestedApiEndpoints?: string[];
+  priority: 'P0' | 'P1' | 'P2';
+  category: 'Feature' | 'Bug' | 'Refactor' | 'Architecture' | 'Security';
+  isDraft: boolean; // default true for review
+  isSelected?: boolean;
+  status: 'pending_review' | 'dispatched' | 'dismissed';
+  dispatchedTo?: {
+    platform: 'github' | 'trello' | 'linear';
+    issueUrl?: string;
+    issueNumber?: number;
+    dispatchedAt: number;
+  };
+  journalId?: string;
+  sourceTextSnippet?: string;
+}
+
+export interface ProjectManagementSettings {
+  enabled: boolean;
+  targetPlatform: 'github' | 'trello';
+  github: {
+    owner: string;
+    repo: string;
+    token?: string;
+    defaultLabels: string[];
+    useDraftLabel: boolean;
+  };
+  trello?: {
+    apiKey?: string;
+    token?: string;
+    boardId?: string;
+    listId?: string;
+  };
+  issueTemplate: 'standard' | 'agile_user_story' | 'technical_rfc';
+  autoExtractOnSave: boolean;
+  requireConfirmation: boolean;
 }
 
 
