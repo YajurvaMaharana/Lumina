@@ -3,6 +3,7 @@ export interface Journal {
   userId: string;
   title: string;
   summary: string;
+  location?: string;
   createdAt: number;
   updatedAt: number;
   messages: Message[];

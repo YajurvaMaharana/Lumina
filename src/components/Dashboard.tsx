@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Book, LogOut, ChevronRight, Loader2, Sparkles } from 'lucide-react';
+import { Plus, Book, LogOut, ChevronRight, Loader2, Sparkles, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { getJournals } from '../lib/db';
 import { Journal } from '../types';
@@ -7,10 +7,11 @@ import { logout } from '../lib/firebase';
 
 interface DashboardProps {
   onSelectJournal: (journalId: string | 'new') => void;
+  onOpenAdmin: () => void;
 }
 
-export default function Dashboard({ onSelectJournal }: DashboardProps) {
-  const { user } = useAuth();
+export default function Dashboard({ onSelectJournal, onOpenAdmin }: DashboardProps) {
+  const { user, isAdmin } = useAuth();
   const [journals, setJournals] = useState<Journal[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -52,6 +53,16 @@ export default function Dashboard({ onSelectJournal }: DashboardProps) {
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-white/50 hidden sm:block">{user?.email}</span>
+          {isAdmin && (
+            <button
+              onClick={onOpenAdmin}
+              className="text-violet-400 hover:text-violet-300 transition-colors flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 hover:bg-violet-500/20"
+              title="Admin Dashboard"
+            >
+              <ShieldAlert className="w-4 h-4" />
+              <span className="hidden sm:inline">Admin Dashboard</span>
+            </button>
+          )}
           <button
             onClick={() => logout()}
             className="text-white/40 hover:text-white/80 transition-colors flex items-center gap-1 text-sm font-medium p-2 rounded-md hover:bg-white/5"

@@ -8,10 +8,12 @@ import { AuthProvider, useAuth } from './lib/AuthContext';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import JournalView from './components/JournalView';
+import AdminDashboard from './components/AdminDashboard';
 import { Loader2 } from 'lucide-react';
 
 function AppContent() {
   const { user, loading } = useAuth();
+  const [view, setView] = useState<'dashboard' | 'admin' | 'journal'>('dashboard');
   const [selectedJournalId, setSelectedJournalId] = useState<string | null>(null);
 
   if (loading) {
@@ -26,17 +28,30 @@ function AppContent() {
     return <Login />;
   }
 
-  if (selectedJournalId) {
+  if (view === 'admin') {
+    return <AdminDashboard onBack={() => setView('dashboard')} />;
+  }
+
+  if (view === 'journal' && selectedJournalId) {
     return (
       <JournalView 
         journalId={selectedJournalId} 
-        onBack={() => setSelectedJournalId(null)} 
+        onBack={() => {
+          setSelectedJournalId(null);
+          setView('dashboard');
+        }} 
       />
     );
   }
 
   return (
-    <Dashboard onSelectJournal={setSelectedJournalId} />
+    <Dashboard 
+      onSelectJournal={(id) => {
+        setSelectedJournalId(id);
+        setView('journal');
+      }} 
+      onOpenAdmin={() => setView('admin')}
+    />
   );
 }
 

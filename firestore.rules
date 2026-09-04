@@ -4,5 +4,14 @@ service cloud.firestore {
     match /users/{userId}/journals/{journalId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+    
+    match /admins/{email} {
+      allow read: if request.auth != null && request.auth.token.email == email;
+    }
+    
+    // Global analytics collection: Only accessible to users listed in the admins collection
+    match /global_analytics/{document=**} {
+      allow read, write: if request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
   }
 }

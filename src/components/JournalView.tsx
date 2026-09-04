@@ -25,6 +25,39 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
         messages: []
       };
       setJournal(newJournal);
+
+      // Attempt to get location
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            try {
+              const idToken = await user!.getIdToken();
+              const response = await fetch('/api/geocode', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify({
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude
+                })
+              });
+              if (response.ok) {
+                const data = await response.json();
+                if (data.location) {
+                  setJournal((prev) => prev ? { ...prev, location: data.location } : prev);
+                }
+              }
+            } catch (err) {
+              console.error("Failed to fetch location:", err);
+            }
+          },
+          (err) => {
+            console.log("Geolocation error or denied:", err);
+          }
+        );
+      }
     } else {
       loadJournal();
     }
@@ -100,7 +133,8 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
           message: userMessage.content,
           history: journal.messages, // Only send previous history
           systemPrompt: `You are an empathetic, insightful, and concise journaling companion. 
-          Help the user reflect on their thoughts. Ask guiding questions if appropriate, or offer new perspectives. 
+          Help the user reflect on their thoughts. Ask guiding questions if appropriate, or offer new perspectives.
+          ${journal.location ? `The user is currently writing from: ${journal.location}. Consider if their physical environment or location might be influencing their mood or thoughts, and gently weave this into your reflection if relevant.` : ''} 
           Keep your responses relatively brief (1-3 paragraphs max) unless the user asks for a deep dive.`
         })
       });
@@ -182,6 +216,14 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
             <div className="text-xs uppercase tracking-[0.2em] text-white/30 font-bold hidden sm:block">Active Session</div>
             <div className="h-4 w-[1px] bg-white/10 hidden sm:block"></div>
             <div className="text-sm font-medium text-violet-400 line-clamp-1 max-w-[200px] sm:max-w-xs">{journal.title}</div>
+            {journal.location && (
+              <>
+                <div className="h-4 w-[1px] bg-white/10 hidden sm:block"></div>
+                <div className="text-xs text-white/40 flex items-center gap-1 line-clamp-1 max-w-[150px]">
+                  <span className="hidden sm:inline">from</span> {journal.location}
+                </div>
+              </>
+            )}
           </div>
         </div>
         <div className="flex items-center text-xs font-medium text-white/30 gap-1.5 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
