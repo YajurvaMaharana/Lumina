@@ -1,5 +1,47 @@
 @import "tailwindcss";
 
+:root {
+  --bg-primary: #05070A;
+  --bg-secondary: #0c1017;
+  --bg-card: rgba(255, 255, 255, 0.03);
+  --bg-card-hover: rgba(255, 255, 255, 0.06);
+  --text-primary: #ffffff;
+  --text-secondary: #E0E6ED;
+  --text-muted: rgba(255, 255, 255, 0.6);
+  --text-faint: rgba(255, 255, 255, 0.4);
+  --border-color: rgba(255, 255, 255, 0.1);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --glow-color: rgba(167, 139, 250, 0.4);
+  --atmosphere-1: #1e1b4b;
+  --atmosphere-2: #4c1d95;
+  --atmosphere-opacity: 0.4;
+  --header-glass-bg: rgba(5, 7, 10, 0.75);
+}
+
+html.light {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
+  --text-primary: #0f172a;
+  --text-secondary: #1e293b;
+  --text-muted: #475569;
+  --text-faint: #64748b;
+  --border-color: rgba(15, 23, 42, 0.12);
+  --border-subtle: rgba(15, 23, 42, 0.06);
+  --glow-color: rgba(124, 58, 237, 0.25);
+  --atmosphere-1: #e0e7ff;
+  --atmosphere-2: #ede9fe;
+  --atmosphere-opacity: 0.8;
+  --header-glass-bg: rgba(255, 255, 255, 0.85);
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-secondary);
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
 @theme {
   --color-stone-50: #05070A;
   --color-stone-100: #1a1d24;
@@ -15,20 +57,21 @@
 
 @layer utilities {
   .atmosphere {
-    background: radial-gradient(circle at 70% 20%, #1e1b4b 0%, transparent 60%), radial-gradient(circle at 20% 80%, #4c1d95 0%, transparent 50%);
+    background: radial-gradient(circle at 70% 20%, var(--atmosphere-1) 0%, transparent 60%), radial-gradient(circle at 20% 80%, var(--atmosphere-2) 0%, transparent 50%);
     filter: blur(80px);
-    opacity: 0.4;
+    opacity: var(--atmosphere-opacity);
+    transition: opacity 0.3s ease;
   }
   .glass {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--bg-card);
     backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-color);
   }
   .serif {
     font-family: 'Georgia', serif;
   }
   .glow-text {
-    text-shadow: 0 0 15px rgba(167, 139, 250, 0.4);
+    text-shadow: 0 0 15px var(--glow-color);
   }
   .reflection-mask {
     mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);

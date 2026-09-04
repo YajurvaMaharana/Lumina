@@ -5,6 +5,7 @@ import { getJournal, saveJournal } from '../lib/db';
 import { Journal, Message, EmotionTag, CBTDistortion } from '../types';
 import EmotionTagManager from './EmotionTagManager';
 import QuoteCardStudio from './QuoteCardStudio';
+import ThemeToggle from './ThemeToggle';
 
 export default function JournalView({ journalId, onBack }: { journalId: string | 'new', onBack: () => void }) {
   const { user } = useAuth();
@@ -580,42 +581,42 @@ Entry Notes: ${tradeNote}`
 
   if (error && !journal) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#05070A] text-[#E0E6ED]">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--bg-primary)] text-[var(--text-secondary)]">
         <p className="text-red-400 mb-4">{error}</p>
-        <button onClick={onBack} className="text-white/60 hover:text-white underline">Go Back</button>
+        <button onClick={onBack} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] underline">Go Back</button>
       </div>
     );
   }
 
   if (!journal) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#05070A] text-[#E0E6ED]">
-        <Loader2 className="w-8 h-8 animate-spin text-white/40" />
+      <div className="flex items-center justify-center min-h-screen bg-[var(--bg-primary)] text-[var(--text-secondary)]">
+        <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[#05070A] text-[#E0E6ED] font-sans relative overflow-hidden">
+    <div className="flex flex-col h-screen bg-[var(--bg-primary)] text-[var(--text-secondary)] font-sans relative overflow-hidden transition-colors duration-200">
       <div className="absolute inset-0 atmosphere pointer-events-none"></div>
       
       {/* Header */}
-      <header className="h-20 flex items-center justify-between px-6 lg:px-10 border-b border-white/5 flex-shrink-0 relative z-10 glass">
+      <header className="h-20 flex items-center justify-between px-6 lg:px-10 border-b border-[var(--border-color)] flex-shrink-0 relative z-10 glass bg-[var(--header-glass-bg)]">
         <div className="flex items-center gap-4">
           <button
             onClick={onBack}
-            className="text-white/40 hover:text-white/80 transition-colors p-2 -ml-2 rounded-xl hover:bg-white/5"
+            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors p-2 -ml-2 rounded-xl hover:bg-[var(--bg-card-hover)]"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-4">
-            <div className="text-xs uppercase tracking-[0.2em] text-white/30 font-bold hidden sm:block">Active Session</div>
-            <div className="h-4 w-[1px] bg-white/10 hidden sm:block"></div>
-            <div className="text-sm font-medium text-violet-400 line-clamp-1 max-w-[200px] sm:max-w-xs">{journal.title}</div>
+            <div className="text-xs uppercase tracking-[0.2em] text-[var(--text-faint)] font-bold hidden sm:block">Active Session</div>
+            <div className="h-4 w-[1px] bg-[var(--border-color)] hidden sm:block"></div>
+            <div className="text-sm font-medium text-violet-600 dark:text-violet-400 line-clamp-1 max-w-[200px] sm:max-w-xs">{journal.title}</div>
             {journal.location && (
               <>
-                <div className="h-4 w-[1px] bg-white/10 hidden sm:block"></div>
-                <div className="text-xs text-white/40 flex items-center gap-1 line-clamp-1 max-w-[150px]">
+                <div className="h-4 w-[1px] bg-[var(--border-color)] hidden sm:block"></div>
+                <div className="text-xs text-[var(--text-muted)] flex items-center gap-1 line-clamp-1 max-w-[150px]">
                   <span className="hidden sm:inline">from</span> {journal.location}
                 </div>
               </>
@@ -623,16 +624,18 @@ Entry Notes: ${tradeNote}`
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <ThemeToggle />
+
           <button
             onClick={() => setShowQuoteStudio(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 text-xs font-semibold text-violet-300 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 text-xs font-semibold text-violet-700 dark:text-violet-300 transition-colors"
             title="Artwork & Quote Card Studio"
           >
             <Palette className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Artwork & Card</span>
           </button>
 
-          <div className="flex items-center text-xs font-medium text-white/30 gap-1.5 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
+          <div className="flex items-center text-xs font-medium text-[var(--text-muted)] gap-1.5 bg-[var(--bg-card)] px-3 py-1.5 rounded-lg border border-[var(--border-color)]">
             {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             {isSaving ? 'Saving...' : 'Saved'}
           </div>
@@ -832,14 +835,14 @@ Entry Notes: ${tradeNote}`
       </main>
 
       {/* Input Area */}
-      <footer className="h-28 px-4 sm:px-10 pb-8 flex items-end justify-center relative z-10 bg-gradient-to-t from-[#05070A] to-transparent shrink-0">
-        <div className="w-full max-w-3xl glass rounded-2xl p-2 flex items-center gap-2 focus-within:ring-2 ring-violet-500/40 transition-all shadow-lg shadow-black/50">
+      <footer className="h-28 px-4 sm:px-10 pb-8 flex items-end justify-center relative z-10 bg-gradient-to-t from-[var(--bg-primary)] to-transparent shrink-0">
+        <div className="w-full max-w-3xl glass bg-[var(--bg-card)] rounded-2xl p-2 flex items-center gap-2 focus-within:ring-2 ring-violet-500/40 transition-all shadow-lg border border-[var(--border-color)]">
           <button
             onClick={toggleRecording}
             className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center transition-colors ${
               isRecording 
-                ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30 animate-pulse' 
-                : 'bg-white/5 text-white/40 hover:bg-white/10 hover:text-white/80'
+                ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30 animate-pulse' 
+                : 'bg-white/5 dark:bg-white/5 text-[var(--text-muted)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]'
             }`}
             title="Toggle voice input"
           >
@@ -851,18 +854,18 @@ Entry Notes: ${tradeNote}`
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={isTradeMode && journal.messages.length === 0 ? "Enter trade notes or thesis rationale..." : "Continue your reflection..."}
-            className="flex-1 bg-transparent border-none outline-none px-2 py-2 text-sm text-white placeholder-white/20"
+            className="flex-1 bg-transparent border-none outline-none px-2 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)]"
           />
           <button
             onClick={handleSend}
             disabled={(!input.trim() && !isTradeMode) || isTyping || showCoolDownModal || coolDownTime > 0 || isEvaluatingTrade}
-            className="w-10 h-10 shrink-0 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-10 h-10 shrink-0 bg-violet-600 hover:bg-violet-500 text-white rounded-xl flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-violet-900/20"
             title={coolDownTime > 0 ? `Cool-down active (${formatTime(coolDownTime)})` : "Send / Log Entry"}
           >
             {isEvaluatingTrade ? (
               <Loader2 className="w-4 h-4 animate-spin text-white/70" />
             ) : (
-              <Send className="w-4 h-4 text-white/80" />
+              <Send className="w-4 h-4 text-white" />
             )}
           </button>
         </div>

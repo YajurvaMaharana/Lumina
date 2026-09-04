@@ -1,6 +1,7 @@
 import React from 'react';
 import { loginWithGoogle } from '../lib/firebase';
 import { BookOpen } from 'lucide-react';
+import ThemeToggle from './ThemeToggle';
 
 export default function Login() {
   const handleLogin = async () => {
@@ -13,21 +14,26 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#05070A] text-[#E0E6ED] flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-secondary)] flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans transition-colors duration-200">
+      <div className="absolute top-6 right-6 z-20">
+        <ThemeToggle />
+      </div>
+
       <div className="absolute inset-0 atmosphere pointer-events-none"></div>
-      <div className="w-full max-w-md glass rounded-2xl p-8 text-center relative z-10">
+      
+      <div className="w-full max-w-md glass bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-8 text-center relative z-10 shadow-xl">
         <div className="flex justify-center mb-6">
           <div className="h-16 w-16 bg-gradient-to-tr from-violet-600 to-indigo-400 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/20">
             <BookOpen size={32} className="text-white" />
           </div>
         </div>
-        <h1 className="text-3xl font-semibold tracking-tight glow-text mb-2 text-white">Lumina</h1>
-        <p className="text-white/50 mb-8 text-sm">
+        <h1 className="text-3xl font-semibold tracking-tight glow-text mb-2 text-[var(--text-primary)]">Lumina</h1>
+        <p className="text-[var(--text-muted)] mb-8 text-sm">
           A private, secure space for your thoughts, guided by AI.
         </p>
         <button
           onClick={handleLogin}
-          className="w-full flex items-center justify-center gap-3 bg-white/5 border border-white/10 hover:bg-white/10 text-white px-6 py-3 rounded-xl font-medium transition-colors outline-none focus:ring-2 focus:ring-violet-500/40 text-sm"
+          className="w-full flex items-center justify-center gap-3 bg-[var(--bg-card-hover)] border border-[var(--border-color)] hover:opacity-90 text-[var(--text-primary)] px-6 py-3 rounded-xl font-medium transition-all outline-none focus:ring-2 focus:ring-violet-500/40 text-sm shadow-sm cursor-pointer"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path

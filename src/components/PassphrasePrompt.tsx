@@ -4,6 +4,7 @@ import { Lock, AlertTriangle, KeyRound, ArrowLeft, Loader2, Key } from 'lucide-r
 import { useAuth } from '../lib/AuthContext';
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import ThemeToggle from './ThemeToggle';
 
 export default function PassphrasePrompt({ onSet }: { onSet: () => void }) {
   const { user } = useAuth();
@@ -143,8 +144,8 @@ export default function PassphrasePrompt({ onSet }: { onSet: () => void }) {
 
   if (mode === 'loading') {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#05070A] text-[#E0E6ED]">
-        <Loader2 className="w-8 h-8 animate-spin text-white/40" />
+      <div className="flex items-center justify-center min-h-screen bg-[var(--bg-primary)] text-[var(--text-secondary)]">
+        <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
       </div>
     );
   }
@@ -153,24 +154,27 @@ export default function PassphrasePrompt({ onSet }: { onSet: () => void }) {
     const [recUser, ...recPassParts] = recoveredCreds.split(':');
     const recPass = recPassParts.join(':');
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#05070A] text-[#E0E6ED] p-4">
-        <div className="max-w-md w-full bg-[#0A0D14] p-8 rounded-2xl border border-white/5 shadow-2xl">
-          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-500/10 mb-6 mx-auto">
-            <Lock className="w-6 h-6 text-green-400" />
+      <div className="flex items-center justify-center min-h-screen bg-[var(--bg-primary)] text-[var(--text-secondary)] p-4 relative font-sans transition-colors duration-200">
+        <div className="absolute top-6 right-6 z-20">
+          <ThemeToggle />
+        </div>
+        <div className="max-w-md w-full glass bg-[var(--bg-card)] p-8 rounded-2xl border border-[var(--border-color)] shadow-2xl">
+          <div className="flex items-center justify-center w-12 h-12 rounded-full bg-emerald-500/10 mb-6 mx-auto">
+            <Lock className="w-6 h-6 text-emerald-500 dark:text-emerald-400" />
           </div>
-          <h2 className="text-2xl font-serif text-center mb-2 text-white">Vault Recovered</h2>
-          <p className="text-white/60 text-center mb-6 text-sm">
+          <h2 className="text-2xl font-serif text-center mb-2 text-[var(--text-primary)]">Vault Recovered</h2>
+          <p className="text-[var(--text-muted)] text-center mb-6 text-sm">
             Your original credentials have been successfully decrypted.
           </p>
           
-          <div className="bg-[#111622] border border-white/10 rounded-xl p-6 mb-6 space-y-4">
+          <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl p-6 mb-6 space-y-4">
             <div>
-              <p className="text-xs text-white/50 uppercase tracking-wider mb-1">Username</p>
-              <p className="font-mono text-white">{recUser}</p>
+              <p className="text-xs text-[var(--text-faint)] uppercase tracking-wider mb-1">Username</p>
+              <p className="font-mono text-[var(--text-primary)]">{recUser}</p>
             </div>
             <div>
-              <p className="text-xs text-white/50 uppercase tracking-wider mb-1">Password</p>
-              <p className="font-mono text-white">{recPass}</p>
+              <p className="text-xs text-[var(--text-faint)] uppercase tracking-wider mb-1">Password</p>
+              <p className="font-mono text-[var(--text-primary)]">{recPass}</p>
             </div>
           </div>
 
@@ -179,7 +183,7 @@ export default function PassphrasePrompt({ onSet }: { onSet: () => void }) {
               setPassword(recoveredCreds);
               onSet();
             }}
-            className="w-full bg-white text-black font-medium py-3 rounded-xl hover:bg-white/90 transition-colors"
+            className="w-full bg-violet-600 hover:bg-violet-500 text-white font-medium py-3 rounded-xl transition-colors shadow-md shadow-violet-900/20"
           >
             Unlock Vault
           </button>
@@ -190,27 +194,30 @@ export default function PassphrasePrompt({ onSet }: { onSet: () => void }) {
 
   if (mode === 'recover') {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#05070A] text-[#E0E6ED] p-4">
-        <div className="max-w-md w-full bg-[#0A0D14] p-8 rounded-2xl border border-white/5 shadow-2xl relative">
-          <button onClick={() => setMode('unlock')} className="absolute top-6 left-6 text-white/40 hover:text-white transition-colors">
+      <div className="flex items-center justify-center min-h-screen bg-[var(--bg-primary)] text-[var(--text-secondary)] p-4 relative font-sans transition-colors duration-200">
+        <div className="absolute top-6 right-6 z-20">
+          <ThemeToggle />
+        </div>
+        <div className="max-w-md w-full glass bg-[var(--bg-card)] p-8 rounded-2xl border border-[var(--border-color)] shadow-2xl relative">
+          <button onClick={() => setMode('unlock')} className="absolute top-6 left-6 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-500/10 mb-6 mx-auto mt-4">
-            <AlertTriangle className="w-6 h-6 text-red-400" />
+            <AlertTriangle className="w-6 h-6 text-red-500 dark:text-red-400" />
           </div>
-          <h2 className="text-2xl font-serif text-center mb-2 text-white">Recover Encryption</h2>
-          <p className="text-white/60 text-center mb-6 text-sm">
+          <h2 className="text-2xl font-serif text-center mb-2 text-[var(--text-primary)]">Recover Encryption</h2>
+          <p className="text-[var(--text-muted)] text-center mb-6 text-sm">
             Enter your 6-digit recovery code to bypass your lost password.
           </p>
 
           <form className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">Recovery Code</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">Recovery Code</label>
               <input
                 type="text"
                 value={recoveryInput}
                 onChange={(e) => setRecoveryInput(e.target.value)}
-                className="w-full bg-[#111622] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 font-mono text-center text-xl tracking-widest focus:outline-none focus:ring-2 focus:ring-white/20 uppercase"
+                className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-primary)] placeholder-[var(--text-faint)] font-mono text-center text-xl tracking-widest focus:outline-none focus:ring-2 focus:ring-violet-500/40 uppercase"
                 placeholder="XXX-XXX"
                 maxLength={7}
                 required
@@ -220,7 +227,7 @@ export default function PassphrasePrompt({ onSet }: { onSet: () => void }) {
               type="button"
               onClick={handleRecoverSubmit}
               disabled={isSubmitting}
-              className="w-full bg-red-500 text-white font-medium py-3 rounded-xl hover:bg-red-600 transition-colors mt-2 flex justify-center items-center"
+              className="w-full bg-red-600 hover:bg-red-500 text-white font-medium py-3 rounded-xl transition-colors mt-2 flex justify-center items-center shadow-md shadow-red-900/20"
             >
               {isSubmitting ? (
                 <>
@@ -240,51 +247,55 @@ export default function PassphrasePrompt({ onSet }: { onSet: () => void }) {
   const isSetup = mode === 'setup';
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-[#05070A] text-[#E0E6ED] p-4">
-      <div className="max-w-md w-full bg-[#0A0D14] p-8 rounded-2xl border border-white/5 shadow-2xl">
-        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-white/5 mb-6 mx-auto">
-          {isSetup ? <KeyRound className="w-6 h-6 text-white" /> : <Lock className="w-6 h-6 text-white" />}
+    <div className="flex items-center justify-center min-h-screen bg-[var(--bg-primary)] text-[var(--text-secondary)] p-4 relative font-sans transition-colors duration-200">
+      <div className="absolute top-6 right-6 z-20">
+        <ThemeToggle />
+      </div>
+
+      <div className="max-w-md w-full glass bg-[var(--bg-card)] p-8 rounded-2xl border border-[var(--border-color)] shadow-2xl">
+        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-violet-500/10 mb-6 mx-auto">
+          {isSetup ? <KeyRound className="w-6 h-6 text-violet-500 dark:text-violet-400" /> : <Lock className="w-6 h-6 text-violet-500 dark:text-violet-400" />}
         </div>
-        <h2 className="text-2xl font-serif text-center mb-2 text-white">
+        <h2 className="text-2xl font-serif text-center mb-2 text-[var(--text-primary)]">
           {isSetup ? "Setup Lumina Vault" : "Unlock Lumina Vault"}
         </h2>
-        <p className="text-white/60 text-center mb-8 text-sm">
+        <p className="text-[var(--text-muted)] text-center mb-8 text-sm">
           {isSetup 
             ? "Create a dedicated username and encryption password for your zero-knowledge vault."
             : "Enter your username and encryption password to decrypt your entries."}
         </p>
         
         <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4 mb-6 flex items-start space-x-3">
-          <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-          <p className="text-sm text-red-200 leading-relaxed">
-            <strong className="block text-red-400 mb-1">Zero-Knowledge Mode Active</strong>
+          <AlertTriangle className="w-5 h-5 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
+          <p className="text-sm text-red-700 dark:text-red-200 leading-relaxed">
+            <strong className="block text-red-700 dark:text-red-400 mb-1">Zero-Knowledge Mode Active</strong>
             If you forget your password, your data cannot be recovered without a Recovery Key.
           </p>
         </div>
 
         <form onSubmit={isSetup ? handleSetupSubmit : handleUnlockSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-white/80 mb-2">
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
               Username
             </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-[#111622] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+              className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-violet-500/40 transition-all"
               placeholder="Enter your username"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-white/80 mb-2">
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
               Password
             </label>
             <input
               type="password"
               value={pass}
               onChange={(e) => setPass(e.target.value)}
-              className="w-full bg-[#111622] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-white/20 transition-all"
+              className="w-full bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl px-4 py-3 text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:ring-2 focus:ring-violet-500/40 transition-all"
               placeholder="Enter your secret password"
               required
             />
@@ -292,15 +303,15 @@ export default function PassphrasePrompt({ onSet }: { onSet: () => void }) {
 
           {isSetup && generatedRecoveryKey && (
             <div className="mt-4 bg-orange-500/10 border border-orange-500/20 rounded-xl p-4">
-              <p className="text-sm font-medium text-orange-400 mb-2 flex items-center gap-2">
+              <p className="text-sm font-medium text-orange-600 dark:text-orange-400 mb-2 flex items-center gap-2">
                 <Key className="w-4 h-4" /> Your Recovery Code
               </p>
-              <div className="bg-[#0A0D14] border border-white/10 rounded-lg p-3 mb-2">
-                <p className="text-center font-mono text-xl tracking-[0.3em] text-white">
+              <div className="bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-lg p-3 mb-2">
+                <p className="text-center font-mono text-xl tracking-[0.3em] text-[var(--text-primary)]">
                   {generatedRecoveryKey}
                 </p>
               </div>
-              <p className="text-xs text-orange-200/80 leading-relaxed">
+              <p className="text-xs text-orange-700 dark:text-orange-200/80 leading-relaxed">
                 Write this code down and keep it safe. This is the <strong>ONLY</strong> way to recover your vault if you lose your password. It will not be shown again.
               </p>
             </div>
@@ -311,7 +322,7 @@ export default function PassphrasePrompt({ onSet }: { onSet: () => void }) {
               <button 
                 type="button" 
                 onClick={() => setMode('recover')}
-                className="text-sm text-white/40 hover:text-white transition-colors"
+                className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
               >
                 Forgot Password / Recover Vault
               </button>
@@ -321,26 +332,26 @@ export default function PassphrasePrompt({ onSet }: { onSet: () => void }) {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-white text-black font-medium py-3 rounded-xl hover:bg-white/90 transition-colors mt-2 flex justify-center items-center"
+            className="w-full bg-violet-600 hover:bg-violet-500 text-white font-medium py-3 rounded-xl transition-colors mt-2 flex justify-center items-center shadow-md shadow-violet-900/20 cursor-pointer"
           >
             {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : (isSetup ? "Create Vault" : "Unlock Vault")}
           </button>
         </form>
 
-        <div className="mt-6 text-center border-t border-white/5 pt-6">
+        <div className="mt-6 text-center border-t border-[var(--border-color)] pt-6">
           {isSetup ? (
             <button 
               onClick={() => setMode('unlock')} 
-              className="text-sm text-white/50 hover:text-white transition-colors"
+              className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
             >
-              Already have a vault? <span className="text-white hover:underline">Existing User Login</span>
+              Already have a vault? <span className="text-violet-600 dark:text-violet-400 font-semibold hover:underline">Existing User Login</span>
             </button>
           ) : (
             <button 
               onClick={() => setMode('setup')} 
-              className="text-sm text-white/50 hover:text-white transition-colors"
+              className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
             >
-              Need a new vault? <span className="text-white hover:underline">Register / Setup Vault</span>
+              Need a new vault? <span className="text-violet-600 dark:text-violet-400 font-semibold hover:underline">Register / Setup Vault</span>
             </button>
           )}
         </div>
