@@ -54,8 +54,8 @@ export const saveJournal = async (userId: string, journal: Journal): Promise<voi
     throw new Error("Zero-Knowledge password is required to save.");
   }
 
-  const { id, title, summary, location, messages, emotions, cbtDistortions, userFeedback, ...baseData } = journal;
-  const sensitiveData = { title, summary, location, messages, emotions, cbtDistortions, userFeedback };
+  const { id, title, summary, location, messages, emotions, cbtDistortions, userFeedback, artwork, ...baseData } = journal;
+  const sensitiveData = { title, summary, location, messages, emotions, cbtDistortions, userFeedback, artwork };
   
   const encryptedPayload = await encryptData(sensitiveData, password);
   

@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Book, LogOut, ChevronRight, Loader2, Sparkles, ShieldAlert, Brain, LayoutGrid, Activity } from 'lucide-react';
+import { Plus, Book, LogOut, ChevronRight, Loader2, Sparkles, ShieldAlert, Brain, LayoutGrid, Activity, Palette } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { getJournals } from '../lib/db';
 import { Journal } from '../types';
 import { logout } from '../lib/firebase';
 import PatternInsightsSection from './PatternInsightsSection';
 import CognitiveSyncSection from './CognitiveSyncSection';
+import ArtworkVisualizerSection from './ArtworkVisualizerSection';
 
 interface DashboardProps {
   onSelectJournal: (journalId: string | 'new') => void;
@@ -16,7 +17,7 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin }: DashboardPro
   const { user, isAdmin } = useAuth();
   const [journals, setJournals] = useState<Journal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'entries' | 'insights' | 'sync'>('entries');
+  const [activeTab, setActiveTab] = useState<'entries' | 'visualizer' | 'insights' | 'sync'>('entries');
 
   useEffect(() => {
     if (user) {
@@ -93,6 +94,18 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin }: DashboardPro
                 <LayoutGrid className="w-3.5 h-3.5" />
                 <span>My Reflections ({journals.length})</span>
               </button>
+
+              <button
+                onClick={() => setActiveTab('visualizer')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === 'visualizer'
+                    ? 'bg-violet-600 text-white shadow-md shadow-violet-950'
+                    : 'text-white/50 hover:text-white/80'
+                }`}
+              >
+                <Palette className="w-3.5 h-3.5 text-violet-300" />
+                <span>Artwork & Visualizations</span>
+              </button>
               
               <button
                 onClick={() => setActiveTab('insights')}
@@ -132,6 +145,8 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin }: DashboardPro
             <div className="flex items-center justify-center py-20 text-white/40">
               <Loader2 className="w-8 h-8 animate-spin text-violet-400" />
             </div>
+          ) : activeTab === 'visualizer' ? (
+            <ArtworkVisualizerSection journals={journals} onSelectJournal={(id) => onSelectJournal(id)} />
           ) : activeTab === 'sync' ? (
             <CognitiveSyncSection journalsCount={journals.length} />
           ) : activeTab === 'insights' ? (

@@ -808,6 +808,110 @@ For every pattern, you MUST include a deep "whyThisMatters" explanation grounded
     }
   });
 
+  // AI-Generated Abstract Artwork Synthesizer Endpoint
+  app.post("/api/artwork/synthesize", authenticateUser, async (req, res) => {
+    const { title, content, emotions = [] } = req.body || {};
+    const fallbackStyle = "abstract_fluid";
+    const fallbackPalette = ["#8B5CF6", "#6366F1", "#EC4899", "#38BDF8", "#10B981"];
+
+    const fallbackArtwork = {
+      style: fallbackStyle,
+      primaryMood: emotions[0]?.name || "Serene Reflection",
+      palette: fallbackPalette,
+      seed: Math.floor(Math.random() * 100000),
+      complexity: 6,
+      valence: 70,
+      arousal: 55,
+      aiConcept: "Harmonic liquid gradients capturing clarity, grounded contemplation, and cognitive expansion.",
+      aiPrompt: "Abstract fine art expressionism, ethereal flowing fluid waves in violet, cyan, and amber gold, volumetric cinematic light, museum quality 8k",
+      quoteSnippet: title || "A moment of deep self-honesty and clarity."
+    };
+
+    try {
+      const emotionsList = emotions.map((e: any) => e.name || e).join(", ");
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.json({ artwork: fallbackArtwork });
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+      const prompt = `You are Lumina's Psychological Visual Arts & Aesthetic Synthesis AI.
+Given this journal reflection:
+Title: "${title || 'Untitled'}"
+Detected Emotions: "${emotionsList || 'Reflective'}"
+Content Excerpt: "${(content || '').slice(0, 800)}"
+
+Analyze the emotional depth, valence (-100 to +100), arousal/energy (0 to 100), and metaphorical tone of this entry.
+Synthesize an abstract artwork concept and 5-color aesthetic palette tailored to the emotional frequency of the writer.
+Extract or synthesize a profound, poetic 1-sentence quote snippet for social cards.
+Choose the best fitting style among: "abstract_fluid", "geometric_aura", "minimalist_waveform", "expressionist_prism", "cyberpunk_glass", "watercolor_mist".`;
+
+      const models = ["gemini-3.1-flash-lite", "gemini-flash-latest", "gemini-3.8-flash"];
+      let responseText = "";
+
+      for (const model of models) {
+        try {
+          const response = await ai.models.generateContent({
+            model,
+            contents: prompt,
+            config: {
+              systemInstruction: "You are an abstract art director and psychological aesthetic designer. Return valid JSON only.",
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  style: {
+                    type: Type.STRING,
+                    enum: ["abstract_fluid", "geometric_aura", "minimalist_waveform", "expressionist_prism", "cyberpunk_glass", "watercolor_mist"]
+                  },
+                  primaryMood: { type: Type.STRING },
+                  palette: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description: "5 hex color codes e.g. #8B5CF6"
+                  },
+                  seed: { type: Type.INTEGER },
+                  complexity: { type: Type.INTEGER, description: "1 to 10" },
+                  valence: { type: Type.INTEGER, description: "-100 to 100" },
+                  arousal: { type: Type.INTEGER, description: "0 to 100" },
+                  aiConcept: { type: Type.STRING },
+                  aiPrompt: { type: Type.STRING },
+                  quoteSnippet: { type: Type.STRING }
+                },
+                required: ["style", "primaryMood", "palette", "seed", "complexity", "valence", "arousal", "aiConcept", "aiPrompt", "quoteSnippet"]
+              }
+            }
+          });
+
+          responseText = response.text || "{}";
+          if (responseText.trim()) break;
+        } catch (err: any) {
+          if (isQuotaOrRateLimitError(err)) continue;
+          console.error(`Artwork AI error on model ${model}:`, err.message || err);
+        }
+      }
+
+      if (!responseText.trim()) {
+        return res.json({ artwork: fallbackArtwork });
+      }
+
+      const parsed = JSON.parse(responseText);
+      // Ensure 5 palette items and valid seed
+      if (!parsed.palette || parsed.palette.length < 3) {
+        parsed.palette = fallbackPalette;
+      }
+      if (!parsed.seed) {
+        parsed.seed = Math.floor(Math.random() * 100000);
+      }
+
+      res.json({ success: true, artwork: parsed });
+    } catch (error) {
+      console.error("Artwork synthesize endpoint error:", error);
+      res.json({ success: true, artwork: fallbackArtwork });
+    }
+  });
+
   // ==========================================
   // COGNITIVE STATE & PERFORMANCE SYNC ENGINE
   // ==========================================

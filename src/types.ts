@@ -27,6 +27,20 @@ export interface PatternInsight {
   createdAt?: number;
 }
 
+export interface JournalArtwork {
+  style: 'abstract_fluid' | 'geometric_aura' | 'minimalist_waveform' | 'expressionist_prism' | 'cyberpunk_glass' | 'watercolor_mist';
+  primaryMood: string;
+  palette: string[];
+  seed: number;
+  complexity: number;
+  valence: number; // -100 (deep negative) to +100 (deep positive)
+  arousal: number; // 0 (calm/still) to 100 (high energy/turbulent)
+  aiConcept?: string;
+  aiPrompt?: string;
+  generatedImageUrl?: string;
+  quoteSnippet?: string;
+}
+
 export interface Journal {
   id: string;
   userId: string;
@@ -38,6 +52,7 @@ export interface Journal {
   messages: Message[];
   emotions?: EmotionTag[];
   cbtDistortions?: CBTDistortion[];
+  artwork?: JournalArtwork;
   userFeedback?: {
     isAccurate: boolean;
     notes?: string;

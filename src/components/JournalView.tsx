@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Sparkles, Loader2, Save, Mic, MicOff, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, Loader2, Save, Mic, MicOff, ShieldAlert, Palette } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { getJournal, saveJournal } from '../lib/db';
 import { Journal, Message, EmotionTag, CBTDistortion } from '../types';
 import EmotionTagManager from './EmotionTagManager';
+import QuoteCardStudio from './QuoteCardStudio';
 
 export default function JournalView({ journalId, onBack }: { journalId: string | 'new', onBack: () => void }) {
   const { user } = useAuth();
@@ -19,6 +20,7 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
   const [invalidation, setInvalidation] = useState('');
   const [emotionalState, setEmotionalState] = useState('');
   const [isAnalyzingEmotion, setIsAnalyzingEmotion] = useState(false);
+  const [showQuoteStudio, setShowQuoteStudio] = useState(false);
   
   // Guardrail modal and countdown timer states
   const [showCoolDownModal, setShowCoolDownModal] = useState(false);
@@ -620,11 +622,34 @@ Entry Notes: ${tradeNote}`
             )}
           </div>
         </div>
-        <div className="flex items-center text-xs font-medium text-white/30 gap-1.5 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
-          {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-          {isSaving ? 'Saving...' : 'Saved'}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowQuoteStudio(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 text-xs font-semibold text-violet-300 transition-colors"
+            title="Artwork & Quote Card Studio"
+          >
+            <Palette className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Artwork & Card</span>
+          </button>
+
+          <div className="flex items-center text-xs font-medium text-white/30 gap-1.5 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
+            {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            {isSaving ? 'Saving...' : 'Saved'}
+          </div>
         </div>
       </header>
+
+      {/* Quote Card Studio Modal */}
+      {showQuoteStudio && journal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-4xl my-auto animate-scaleUp">
+            <QuoteCardStudio
+              journal={journal}
+              onClose={() => setShowQuoteStudio(false)}
+            />
+          </div>
+        </div>
+      )}
 
       {/* Chat Area */}
       <main className="flex-1 overflow-hidden flex flex-col relative z-10 px-4 sm:px-10">
