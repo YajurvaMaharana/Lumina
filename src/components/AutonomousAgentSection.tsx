@@ -192,6 +192,28 @@ export default function AutonomousAgentSection({ journalsCount }: AutonomousAgen
         setSelectedScorecard(data.scorecard);
         setScorecards(prev => [data.scorecard, ...prev.filter(s => s.id !== data.scorecard.id)]);
         setStatusMessage(data.message || "Habit Evolution Scorecard generated successfully.");
+
+        // Persist scorecard and execution record to Firestore from client
+        try {
+          await saveHabitScorecard(user.uid, data.scorecard);
+          const executionRecord = {
+            timestamp: Date.now(),
+            status: 'success' as const,
+            summary: data.scorecard.executiveSummary,
+            deliveredChannels: data.deliveredChannels || ['in_app']
+          };
+          const updatedHistory = [executionRecord, ...(agentSettings.executionHistory || [])].slice(0, 15);
+          const updatedSettings: AutonomousAgentSettings = {
+            ...agentSettings,
+            lastExecutedAt: Date.now(),
+            lastScorecardId: data.scorecard.id,
+            executionHistory: updatedHistory
+          };
+          setAgentSettings(updatedSettings);
+          await saveAgentSettings(user.uid, updatedSettings);
+        } catch (saveErr) {
+          console.warn("Could not persist scorecard locally:", saveErr);
+        }
       } else if (data.skipped) {
         setStatusMessage(`ℹ️ ${data.reason}`);
       } else {

@@ -68,6 +68,7 @@ function AppContent() {
         setView('journal');
       }} 
       onOpenAdmin={() => setView('admin')}
+      onLockVault={() => setHasPassword(false)}
     />
   );
 }

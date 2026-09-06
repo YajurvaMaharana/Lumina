@@ -73,6 +73,8 @@ export interface Message {
   role: 'user' | 'model';
   content: string;
   timestamp: number;
+  mediaBase64?: string;
+  mediaMimeType?: string;
 }
 
 export interface User {

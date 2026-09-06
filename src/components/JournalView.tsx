@@ -1,11 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Sparkles, Loader2, Save, Mic, MicOff, ShieldAlert, Palette } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, Loader2, Save, Mic, MicOff, ShieldAlert, Palette, Paperclip, X, MapPin, ChevronDown, UserCog } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { getJournal, saveJournal } from '../lib/db';
 import { Journal, Message, EmotionTag, CBTDistortion } from '../types';
 import EmotionTagManager from './EmotionTagManager';
 import QuoteCardStudio from './QuoteCardStudio';
 import ThemeToggle from './ThemeToggle';
+
+export type AIPersona = 'neutral' | 'analytical' | 'empathetic';
+
+export const PERSONAS: Record<AIPersona, { id: AIPersona; name: string; description: string; prompt: string }> = {
+  neutral: {
+    id: 'neutral',
+    name: "Neutral Listener",
+    description: "I listen objectively without judgment and ask clarifying questions to help you unpack your thoughts.",
+    prompt: "You are a neutral, objective listener. Your goal is to provide a safe space for the user to vent. Do NOT offer advice, judgments, or deep analysis unless requested. Ask simple, clarifying questions to help the user unpack their thoughts organically."
+  },
+  analytical: {
+    id: 'analytical',
+    name: "Analytical Coach",
+    description: "I am direct and logic-driven. I challenge cognitive distortions and focus on problem-solving.",
+    prompt: "You are an analytical, logic-driven coach. Your goal is to identify cognitive distortions, challenge the user's assumptions, and push them toward actionable problem-solving. Be direct, objective, and somewhat firm. Use Socratic questioning to expose logical flaws or blind spots."
+  },
+  empathetic: {
+    id: 'empathetic',
+    name: "Empathetic Friend",
+    description: "I am a warm companion. I offer emotional support, gentle encouragement, and validation.",
+    prompt: "You are a warm, empathetic, and validating friend. Your goal is to offer emotional support and help the user feel heard and understood. Validate their feelings before asking gentle, guiding questions. Use a warm, comforting tone."
+  }
+};
 
 export default function JournalView({ journalId, onBack }: { journalId: string | 'new', onBack: () => void }) {
   const { user } = useAuth();
@@ -23,6 +46,10 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
   const [isAnalyzingEmotion, setIsAnalyzingEmotion] = useState(false);
   const [showQuoteStudio, setShowQuoteStudio] = useState(false);
   
+  const [mediaFile, setMediaFile] = useState<{ url: string; base64: string; mimeType: string } | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
   // Guardrail modal and countdown timer states
   const [showCoolDownModal, setShowCoolDownModal] = useState(false);
   const [coolDownTime, setCoolDownTime] = useState(0); // In seconds
@@ -31,6 +58,8 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
   const [isEvaluatingTrade, setIsEvaluatingTrade] = useState(false);
   const [biasWarning, setBiasWarning] = useState<any>(null);
   const [hasPassedEvaluation, setHasPassedEvaluation] = useState(false);
+  const [activePersona, setActivePersona] = useState<AIPersona>('empathetic');
+  const [showPersonaDropdown, setShowPersonaDropdown] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -38,10 +67,11 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
   // Active 15-minute countdown interval
   useEffect(() => {
     let interval: any = null;
-    if (showCoolDownModal && coolDownTime > 0) {
+    if (showCoolDownModal) {
       interval = setInterval(() => {
         setCoolDownTime((prev) => {
           if (prev <= 1) {
+            clearInterval(interval);
             setShowCoolDownModal(false);
             setHasPassedEvaluation(true);
             return 0;
@@ -49,28 +79,17 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
           return prev - 1;
         });
       }, 1000);
-    } else if (coolDownTime <= 0 && showCoolDownModal) {
-      setShowCoolDownModal(false);
-      setHasPassedEvaluation(true);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [showCoolDownModal, coolDownTime]);
+  }, [showCoolDownModal]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
-
-  useEffect(() => {
-    if (isTradeMode && !btcPrice) {
-      fetch('/api/market/btc', {
-        headers: { 'Authorization': `Bearer ${user?.uid}` } // Just passing dummy token, real token later
-      }).catch(() => {});
-    }
-  }, [isTradeMode]);
 
   useEffect(() => {
     if (isTradeMode) {
@@ -153,6 +172,54 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
     }
   };
 
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+
+  const requestLocation = () => {
+    if (!journal || journal.location) return; // already have it
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser");
+      return;
+    }
+
+    setIsFetchingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const idToken = await user!.getIdToken();
+          const response = await fetch('/api/geocode', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${idToken}`
+            },
+            body: JSON.stringify({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude
+            })
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.location) {
+              const updatedJournal = { ...journal, location: data.location };
+              setJournal(updatedJournal);
+              await saveJournal(user!.uid, updatedJournal);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch location:", err);
+          setError("Failed to fetch location data.");
+        } finally {
+          setIsFetchingLocation(false);
+        }
+      },
+      (err) => {
+        console.log("Geolocation error or denied:", err);
+        setError("Location permission denied or unavailable.");
+        setIsFetchingLocation(false);
+      }
+    );
+  };
+
   useEffect(() => {
     if (journalId === 'new') {
       const newJournal: Journal = {
@@ -165,39 +232,6 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
         messages: []
       };
       setJournal(newJournal);
-
-      // Attempt to get location
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          async (position) => {
-            try {
-              const idToken = await user!.getIdToken();
-              const response = await fetch('/api/geocode', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${idToken}`
-                },
-                body: JSON.stringify({
-                  lat: position.coords.latitude,
-                  lng: position.coords.longitude
-                })
-              });
-              if (response.ok) {
-                const data = await response.json();
-                if (data.location) {
-                  setJournal((prev) => prev ? { ...prev, location: data.location } : prev);
-                }
-              }
-            } catch (err) {
-              console.error("Failed to fetch location:", err);
-            }
-          },
-          (err) => {
-            console.log("Geolocation error or denied:", err);
-          }
-        );
-      }
     } else {
       loadJournal();
     }
@@ -205,7 +239,7 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [journal?.messages, isTyping]);
+  }, [journal?.messages?.length, isTyping]);
 
   const loadJournal = async () => {
     try {
@@ -224,8 +258,8 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
     }
   };
 
-  const analyzeEmotionForEntry = async (text: string, currentJournal: Journal) => {
-    if (!user || !text.trim()) return;
+  const analyzeEmotionForEntry = async (text: string, currentJournal: Journal, mediaBase64?: string, mediaMimeType?: string) => {
+    if (!user || (!text.trim() && !mediaBase64)) return;
     setIsAnalyzingEmotion(true);
     try {
       const idToken = await user.getIdToken();
@@ -237,6 +271,8 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
         },
         body: JSON.stringify({
           text,
+          mediaBase64,
+          mediaMimeType,
           context: {
             isTradeMode,
             title: currentJournal.title,
@@ -260,6 +296,67 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
       console.error('Failed to analyze emotion:', err);
     } finally {
       setIsAnalyzingEmotion(false);
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsCompressing(true);
+    try {
+      if (file.type.startsWith('image/')) {
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        await new Promise((resolve) => (img.onload = resolve));
+
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 1200;
+        const MAX_HEIGHT = 1200;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        const base64Data = dataUrl.split(',')[1];
+        setMediaFile({
+          url: dataUrl,
+          base64: base64Data,
+          mimeType: 'image/jpeg'
+        });
+      } else {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          const base64Data = result.split(',')[1];
+          setMediaFile({
+            url: result,
+            base64: base64Data,
+            mimeType: file.type
+          });
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (err) {
+      console.error("Failed to process file:", err);
+    } finally {
+      setIsCompressing(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -469,8 +566,12 @@ Entry Notes: ${tradeNote}`
       id: crypto.randomUUID(),
       role: 'user',
       content: compiledInput,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      ...(mediaFile && { mediaBase64: mediaFile.base64, mediaMimeType: mediaFile.mimeType })
     };
+
+    const currentMediaFile = mediaFile;
+    setMediaFile(null); // Clear preview early
 
     const updatedMessages = [...journal.messages, userMessage];
     
@@ -515,12 +616,14 @@ Entry Notes: ${tradeNote}`
         },
         body: JSON.stringify({
           message: userMessage.content,
+          mediaBase64: currentMediaFile?.base64,
+          mediaMimeType: currentMediaFile?.mimeType,
           history: journal.messages, // Only send previous history
-          systemPrompt: `You are an empathetic, insightful, Socratic journaling mentor. Your goal is to foster deep self-reflection.
+          systemPrompt: `You are an insightful journaling mentor. ${PERSONAS[activePersona].prompt}
           Do NOT provide generic chatbot answers, platitudes, or simple validations. 
-          Instead, analyze the user's reflection and ask deep, penetrating Socratic follow-up questions (e.g., 'What would prove this wrong?', 'How does this connect to last week?', 'What underlying assumption is driving this feeling?').
-          ${journal.location ? `The user is currently writing from: ${journal.location}. Consider if their physical environment or location might be influencing their mood or thoughts, and gently weave this into your reflection if relevant.` : ''} 
-          Keep your responses concise (1-2 paragraphs), focusing entirely on the follow-up question to unpack their thoughts further.`
+          Analyze the user's reflection (and any attached media) and ask deep follow-up questions.
+          ${journal.location ? `The user is currently writing from: ${journal.location}. Consider this in context.` : ''} 
+          Keep your responses concise (1-2 paragraphs), focusing entirely on the follow-up question.`
         })
       });
 
@@ -559,7 +662,7 @@ Entry Notes: ${tradeNote}`
 
       // Concurrently run Granular Emotion & CBT Analysis on original user reflection
       if (updatedMessages.length > 0) {
-        analyzeEmotionForEntry(updatedMessages[0].content, finalJournal);
+        analyzeEmotionForEntry(updatedMessages[0].content, finalJournal, currentMediaFile?.base64, currentMediaFile?.mimeType);
       }
 
     } catch (err) {
@@ -601,7 +704,7 @@ Entry Notes: ${tradeNote}`
       <div className="absolute inset-0 atmosphere pointer-events-none"></div>
       
       {/* Header */}
-      <header className="h-20 flex items-center justify-between px-6 lg:px-10 border-b border-[var(--border-color)] flex-shrink-0 relative z-10 glass bg-[var(--header-glass-bg)]">
+      <header className="h-20 flex items-center justify-between px-6 lg:px-10 border-b border-[var(--border-color)] flex-shrink-0 relative z-50 glass bg-[var(--header-glass-bg)]">
         <div className="flex items-center gap-4">
           <button
             onClick={onBack}
@@ -624,6 +727,49 @@ Entry Notes: ${tradeNote}`
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {/* Persona Selector */}
+          <div className="relative">
+            <button
+              onClick={() => setShowPersonaDropdown(!showPersonaDropdown)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)] border border-[var(--border-color)] text-xs font-medium text-[var(--text-secondary)] transition-colors"
+              title="Select Mentor Persona"
+            >
+              <UserCog className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+              <span className="hidden sm:inline">{PERSONAS[activePersona].name}</span>
+              <ChevronDown className="w-3.5 h-3.5 opacity-50" />
+            </button>
+            {showPersonaDropdown && (
+              <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-[#0c1017] border border-[var(--border-color)] rounded-xl shadow-2xl overflow-hidden z-50">
+                <div className="p-2 bg-slate-50 dark:bg-[#111827] border-b border-[var(--border-color)]">
+                  <h4 className="text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider px-2">Mentor Style</h4>
+                </div>
+                <div className="p-1">
+                  {(Object.values(PERSONAS) as (typeof PERSONAS[AIPersona])[]).map(persona => (
+                    <button
+                      key={persona.id}
+                      onClick={() => {
+                        setActivePersona(persona.id);
+                        setShowPersonaDropdown(false);
+                      }}
+                      className={`w-full text-left p-3 rounded-lg mb-1 last:mb-0 transition-colors ${
+                        activePersona === persona.id 
+                          ? 'bg-violet-600/10 border border-violet-500/20' 
+                          : 'hover:bg-slate-100 dark:hover:bg-[#1f2937] border border-transparent'
+                      }`}
+                    >
+                      <div className={`text-sm font-medium ${activePersona === persona.id ? 'text-violet-600 dark:text-violet-400' : 'text-[var(--text-primary)]'}`}>
+                        {persona.name}
+                      </div>
+                      <div className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
+                        {persona.description}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           <ThemeToggle />
 
           <button
@@ -746,6 +892,15 @@ Entry Notes: ${tradeNote}`
                   <p className="serif text-2xl sm:text-3xl leading-relaxed italic text-white/90 whitespace-pre-wrap pl-4 border-l-2 border-white/10">
                     "{journal.messages[0].content}"
                   </p>
+                  {journal.messages[0].mediaBase64 && journal.messages[0].mediaMimeType && (
+                    <div className="mt-4 rounded-xl overflow-hidden border border-white/10 max-w-sm shadow-lg">
+                      {journal.messages[0].mediaMimeType.startsWith('image/') ? (
+                        <img src={`data:${journal.messages[0].mediaMimeType};base64,${journal.messages[0].mediaBase64}`} alt="Attached media" className="w-full h-auto object-cover" />
+                      ) : (
+                         <div className="p-4 bg-white/5 text-white/60 text-xs font-mono">Attachment: {journal.messages[0].mediaMimeType}</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -792,6 +947,15 @@ Entry Notes: ${tradeNote}`
                         <p className="text-base leading-relaxed text-white/90 whitespace-pre-wrap">
                           {msg.content}
                         </p>
+                        {msg.mediaBase64 && msg.mediaMimeType && (
+                          <div className="mt-3 rounded-lg overflow-hidden border border-white/10 max-w-[200px] ml-auto">
+                            {msg.mediaMimeType.startsWith('image/') ? (
+                              <img src={`data:${msg.mediaMimeType};base64,${msg.mediaBase64}`} alt="Attached media" className="w-full h-auto object-cover" />
+                            ) : (
+                               <div className="p-2 bg-white/5 text-white/60 text-[10px] font-mono">Attachment: {msg.mediaMimeType}</div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div key={msg.id} className="space-y-2 self-start max-w-[85%] bg-violet-500/10 border border-violet-500/10 p-4 rounded-2xl rounded-tl-sm">
@@ -835,39 +999,88 @@ Entry Notes: ${tradeNote}`
       </main>
 
       {/* Input Area */}
-      <footer className="h-28 px-4 sm:px-10 pb-8 flex items-end justify-center relative z-10 bg-gradient-to-t from-[var(--bg-primary)] to-transparent shrink-0">
-        <div className="w-full max-w-3xl glass bg-[var(--bg-card)] rounded-2xl p-2 flex items-center gap-2 focus-within:ring-2 ring-violet-500/40 transition-all shadow-lg border border-[var(--border-color)]">
-          <button
-            onClick={toggleRecording}
-            className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center transition-colors ${
-              isRecording 
-                ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30 animate-pulse' 
-                : 'bg-white/5 dark:bg-white/5 text-[var(--text-muted)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]'
-            }`}
-            title="Toggle voice input"
-          >
-            {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          </button>
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isTradeMode && journal.messages.length === 0 ? "Enter trade notes or thesis rationale..." : "Continue your reflection..."}
-            className="flex-1 bg-transparent border-none outline-none px-2 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)]"
-          />
-          <button
-            onClick={handleSend}
-            disabled={(!input.trim() && !isTradeMode) || isTyping || showCoolDownModal || coolDownTime > 0 || isEvaluatingTrade}
-            className="w-10 h-10 shrink-0 bg-violet-600 hover:bg-violet-500 text-white rounded-xl flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-violet-900/20"
-            title={coolDownTime > 0 ? `Cool-down active (${formatTime(coolDownTime)})` : "Send / Log Entry"}
-          >
-            {isEvaluatingTrade ? (
-              <Loader2 className="w-4 h-4 animate-spin text-white/70" />
-            ) : (
-              <Send className="w-4 h-4 text-white" />
-            )}
-          </button>
+      <footer className="h-auto min-h-[7rem] pt-4 px-4 sm:px-10 pb-8 flex flex-col justify-end items-center relative z-10 bg-gradient-to-t from-[var(--bg-primary)] to-transparent shrink-0">
+        <div className="w-full max-w-3xl glass bg-[var(--bg-card)] rounded-2xl p-2 flex flex-col focus-within:ring-2 ring-violet-500/40 transition-all shadow-lg border border-[var(--border-color)]">
+          {mediaFile && (
+            <div className="w-full flex items-center gap-2 px-2 pt-1 pb-2 border-b border-white/5 mb-2">
+              <div className="relative h-16 w-16 rounded-lg overflow-hidden border border-white/10 group bg-black/20">
+                {mediaFile.mimeType.startsWith('image/') ? (
+                  <img src={mediaFile.url} alt="Attachment preview" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-white/50 text-xs font-mono">MEDIA</div>
+                )}
+                <button onClick={() => setMediaFile(null)} className="absolute top-1 right-1 p-1 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          )}
+          <div className="w-full flex items-center gap-2">
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileSelect} 
+              className="hidden" 
+              accept="image/*,video/*,audio/*"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isCompressing}
+              className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center transition-colors ${
+                isCompressing 
+                  ? 'bg-violet-500/20 text-violet-500 animate-pulse' 
+                  : 'bg-white/5 dark:bg-white/5 text-[var(--text-muted)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]'
+              }`}
+              title="Attach media"
+            >
+              {isCompressing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={toggleRecording}
+              className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center transition-colors ${
+                isRecording 
+                  ? 'bg-red-500/20 text-red-500 hover:bg-red-500/30 animate-pulse' 
+                  : 'bg-white/5 dark:bg-white/5 text-[var(--text-muted)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]'
+              }`}
+              title="Toggle voice input"
+            >
+              {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={requestLocation}
+              disabled={isFetchingLocation || !!journal.location}
+              className={`w-10 h-10 shrink-0 rounded-xl flex items-center justify-center transition-colors ${
+                journal.location 
+                  ? 'bg-green-500/10 text-green-400' 
+                  : isFetchingLocation
+                  ? 'bg-violet-500/20 text-violet-500 animate-pulse'
+                  : 'bg-white/5 dark:bg-white/5 text-[var(--text-muted)] hover:bg-[var(--bg-card-hover)] hover:text-[var(--text-primary)]'
+              }`}
+              title={journal.location ? `Location attached: ${journal.location}` : "Auto-attach location data"}
+            >
+              {isFetchingLocation ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+            </button>
+            <input
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={isTradeMode && journal.messages.length === 0 ? "Enter trade notes or thesis rationale..." : "Continue your reflection..."}
+              className="flex-1 bg-transparent border-none outline-none px-2 py-2 text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)]"
+            />
+            <button
+              onClick={handleSend}
+              disabled={(!input.trim() && !isTradeMode && !mediaFile) || isTyping || showCoolDownModal || coolDownTime > 0 || isEvaluatingTrade}
+              className="w-10 h-10 shrink-0 bg-violet-600 hover:bg-violet-500 text-white rounded-xl flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-violet-900/20"
+              title={coolDownTime > 0 ? `Cool-down active (${formatTime(coolDownTime)})` : "Send / Log Entry"}
+            >
+              {isEvaluatingTrade ? (
+                <Loader2 className="w-4 h-4 animate-spin text-white/70" />
+              ) : (
+                <Send className="w-4 h-4 text-white" />
+              )}
+            </button>
+          </div>
         </div>
       </footer>
 

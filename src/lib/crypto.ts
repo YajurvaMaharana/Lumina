@@ -52,14 +52,26 @@ export const encryptData = async (data: any, password: string) => {
     encodedData
   );
 
-  const ciphertextArray = Array.from(new Uint8Array(encryptedBuffer));
-  const saltArray = Array.from(salt);
-  const ivArray = Array.from(iv);
+  let ciphertextStr = '';
+  const cipherBytes = new Uint8Array(encryptedBuffer);
+  for (let i = 0; i < cipherBytes.byteLength; i++) {
+    ciphertextStr += String.fromCharCode(cipherBytes[i]);
+  }
+
+  let saltStr = '';
+  for (let i = 0; i < salt.byteLength; i++) {
+    saltStr += String.fromCharCode(salt[i]);
+  }
+
+  let ivStr = '';
+  for (let i = 0; i < iv.byteLength; i++) {
+    ivStr += String.fromCharCode(iv[i]);
+  }
 
   return {
-    ciphertext: btoa(String.fromCharCode.apply(null, ciphertextArray)),
-    salt: btoa(String.fromCharCode.apply(null, saltArray)),
-    iv: btoa(String.fromCharCode.apply(null, ivArray))
+    ciphertext: btoa(ciphertextStr),
+    salt: btoa(saltStr),
+    iv: btoa(ivStr)
   };
 };
 
@@ -67,9 +79,23 @@ export const decryptData = async (
   encryptedPayload: { ciphertext: string, salt: string, iv: string }, 
   password: string
 ) => {
-  const salt = new Uint8Array(atob(encryptedPayload.salt).split('').map(c => c.charCodeAt(0)));
-  const iv = new Uint8Array(atob(encryptedPayload.iv).split('').map(c => c.charCodeAt(0)));
-  const ciphertext = new Uint8Array(atob(encryptedPayload.ciphertext).split('').map(c => c.charCodeAt(0)));
+  const saltStr = atob(encryptedPayload.salt);
+  const salt = new Uint8Array(saltStr.length);
+  for (let i = 0; i < saltStr.length; i++) {
+    salt[i] = saltStr.charCodeAt(i);
+  }
+
+  const ivStr = atob(encryptedPayload.iv);
+  const iv = new Uint8Array(ivStr.length);
+  for (let i = 0; i < ivStr.length; i++) {
+    iv[i] = ivStr.charCodeAt(i);
+  }
+
+  const ciphertextStr = atob(encryptedPayload.ciphertext);
+  const ciphertext = new Uint8Array(ciphertextStr.length);
+  for (let i = 0; i < ciphertextStr.length; i++) {
+    ciphertext[i] = ciphertextStr.charCodeAt(i);
+  }
 
   const key = await deriveKey(password, salt);
 

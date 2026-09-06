@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Book, LogOut, ChevronRight, Loader2, Sparkles, ShieldAlert, Brain, LayoutGrid, Activity, Palette, Bot, GitPullRequest } from 'lucide-react';
+import { Plus, Book, LogOut, ChevronRight, Loader2, Sparkles, ShieldAlert, Brain, LayoutGrid, Activity, Palette, Bot, GitPullRequest, Trash2, AlertTriangle, Search } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { getJournals } from '../lib/db';
+import { db } from '../lib/firebase';
+import { deleteDoc, doc } from 'firebase/firestore';
 import { Journal } from '../types';
 import { logout } from '../lib/firebase';
 import PatternInsightsSection from './PatternInsightsSection';
@@ -9,18 +11,22 @@ import CognitiveSyncSection from './CognitiveSyncSection';
 import ArtworkVisualizerSection from './ArtworkVisualizerSection';
 import AutonomousAgentSection from './AutonomousAgentSection';
 import ProjectManagementSection from './ProjectManagementSection';
+import AskJournalSection from './AskJournalSection';
 import ThemeToggle from './ThemeToggle';
+import ProfileDropdown from './ProfileDropdown';
 
 interface DashboardProps {
   onSelectJournal: (journalId: string | 'new') => void;
   onOpenAdmin: () => void;
+  onLockVault?: () => void;
 }
 
-export default function Dashboard({ onSelectJournal, onOpenAdmin }: DashboardProps) {
+export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }: DashboardProps) {
   const { user, isAdmin } = useAuth();
   const [journals, setJournals] = useState<Journal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'entries' | 'agent' | 'pm' | 'visualizer' | 'insights' | 'sync'>('entries');
+  const [activeTab, setActiveTab] = useState<'entries' | 'ask' | 'agent' | 'pm' | 'visualizer' | 'insights' | 'sync'>('entries');
+  const [deletingJournalId, setDeletingJournalId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -39,6 +45,18 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin }: DashboardPro
     }
   };
 
+  const handleDeleteJournal = async () => {
+    if (!deletingJournalId || !user) return;
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'journals', deletingJournalId));
+      setJournals((prev) => prev.filter((j) => j.id !== deletingJournalId));
+      setDeletingJournalId(null);
+    } catch (error) {
+      console.error("Failed to delete journal:", error);
+      alert("Failed to delete the entry. Please try again.");
+    }
+  };
+
   const formatDate = (ts: number) => {
     return new Intl.DateTimeFormat('en-US', {
       month: 'short',
@@ -51,37 +69,32 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin }: DashboardPro
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-secondary)] font-sans relative overflow-hidden flex flex-col transition-colors duration-200">
       <div className="absolute inset-0 atmosphere pointer-events-none"></div>
       
-      <header className="h-20 flex items-center justify-between px-6 lg:px-10 border-b border-[var(--border-color)] relative z-10 shrink-0 glass bg-[var(--header-glass-bg)]">
+      <header className="h-20 flex items-center justify-between px-6 lg:px-10 border-b border-[var(--border-color)] relative z-20 shrink-0 glass bg-[var(--header-glass-bg)]">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-400 shadow-lg shadow-violet-500/20 flex items-center justify-center">
             <Book className="w-4 h-4 text-white" />
           </div>
           <h1 className="text-xl font-semibold tracking-tight glow-text text-[var(--text-primary)]">Lumina</h1>
         </div>
-        <div className="flex items-center gap-3 sm:gap-4">
-          <span className="text-sm text-[var(--text-muted)] hidden sm:block font-medium">{user?.email}</span>
-          
+        <div className="flex items-center gap-2.5 sm:gap-3.5">
+          {/* Ask Journal Quick Action */}
+          <button
+            onClick={() => setActiveTab('ask')}
+            className={`flex items-center justify-center p-2 rounded-xl transition-all border ${
+              activeTab === 'ask'
+                ? 'bg-violet-600 text-white border-violet-500 shadow-md shadow-violet-900/20'
+                : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] hover:text-violet-500 dark:hover:text-violet-400'
+            }`}
+            title="Ask Your Journal"
+          >
+            <Search className="w-5 h-5" />
+          </button>
+
           {/* Theme Toggle Component */}
           <ThemeToggle />
 
-          {isAdmin && (
-            <button
-              onClick={onOpenAdmin}
-              className="text-violet-500 hover:text-violet-600 dark:text-violet-400 dark:hover:text-violet-300 transition-colors flex items-center gap-2 text-sm font-medium px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 hover:bg-violet-500/20"
-              title="Admin Dashboard"
-            >
-              <ShieldAlert className="w-4 h-4" />
-              <span className="hidden sm:inline">Admin Dashboard</span>
-            </button>
-          )}
-          <button
-            onClick={() => logout()}
-            className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-1 text-sm font-medium p-2 rounded-md hover:bg-[var(--bg-card-hover)]"
-            title="Sign Out"
-          >
-            <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Sign Out</span>
-          </button>
+          {/* Profile Dropdown Component */}
+          <ProfileDropdown onOpenAdmin={onOpenAdmin} onLockVault={onLockVault} />
         </div>
       </header>
 
@@ -176,6 +189,8 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin }: DashboardPro
             <div className="flex items-center justify-center py-20 text-[var(--text-muted)]">
               <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
             </div>
+          ) : activeTab === 'ask' ? (
+            <AskJournalSection journals={journals} onSelectJournal={(id) => onSelectJournal(id)} />
           ) : activeTab === 'agent' ? (
             <AutonomousAgentSection journalsCount={journals.length} />
           ) : activeTab === 'pm' ? (
@@ -205,63 +220,104 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin }: DashboardPro
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {journals.map((journal) => (
-                <button
-                  key={journal.id}
-                  onClick={() => onSelectJournal(journal.id)}
-                  className="group flex flex-col items-start text-left glass p-6 rounded-2xl hover:bg-[var(--bg-card-hover)] transition-all focus:outline-none focus:ring-2 focus:ring-violet-500/40 relative border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm"
-                >
-                  <div className="flex items-center justify-between w-full mb-3">
-                    <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400/80 uppercase tracking-widest">
-                      {formatDate(journal.createdAt)}
-                    </span>
-                    <ChevronRight className="w-4 h-4 text-[var(--text-faint)] group-hover:text-[var(--text-muted)] transition-colors" />
-                  </div>
-
-                  <h3 className="text-base font-semibold text-[var(--text-primary)] mb-2 line-clamp-1 group-hover:text-violet-500 dark:group-hover:text-white transition-colors">
-                    {journal.title || "Untitled Entry"}
-                  </h3>
-
-                  <p className="text-[var(--text-muted)] text-xs line-clamp-3 mb-4 flex-grow leading-relaxed">
-                    {journal.summary || (journal.messages.length > 0 ? journal.messages[0].content : "Empty entry")}
-                  </p>
-
-                  {/* Emotion and Distortion Badges */}
-                  {journal.emotions && journal.emotions.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-1.5 mb-3 w-full">
-                      {journal.emotions.slice(0, 2).map((emo) => (
-                        <span
-                          key={emo.id || emo.name}
-                          className="text-[10px] px-2 py-0.5 rounded-md bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-500/20 font-medium"
-                        >
-                          {emo.name} ({emo.confidence}%)
-                        </span>
-                      ))}
-                      {journal.emotions.length > 2 && (
-                        <span className="text-[9px] text-[var(--text-faint)]">
-                          +{journal.emotions.length - 2}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {journal.cbtDistortions && journal.cbtDistortions.length > 0 && (
-                    <div className="mb-3">
-                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/20 font-medium">
-                        ⚠️ {journal.cbtDistortions[0].type}
+                <div key={journal.id} className="relative group">
+                  <button
+                    onClick={() => onSelectJournal(journal.id)}
+                    className="w-full h-full flex flex-col items-start text-left glass p-6 rounded-2xl hover:bg-[var(--bg-card-hover)] transition-all focus:outline-none focus:ring-2 focus:ring-violet-500/40 border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm"
+                  >
+                    <div className="flex items-center justify-between w-full mb-3 pr-6">
+                      <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400/80 uppercase tracking-widest">
+                        {formatDate(journal.createdAt)}
                       </span>
+                      <ChevronRight className="w-4 h-4 text-[var(--text-faint)] group-hover:text-[var(--text-muted)] transition-colors" />
                     </div>
-                  )}
 
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-faint)] mt-auto pt-2 border-t border-[var(--border-subtle)] w-full">
-                    <Sparkles className="w-3.5 h-3.5 text-violet-500 dark:text-violet-400" />
-                    <span>{journal.messages.length} reflections</span>
-                  </div>
-                </button>
+                    <h3 className="text-base font-semibold text-[var(--text-primary)] mb-2 line-clamp-1 group-hover:text-violet-500 dark:group-hover:text-white transition-colors">
+                      {journal.title || "Untitled Entry"}
+                    </h3>
+
+                    <p className="text-[var(--text-muted)] text-xs line-clamp-3 mb-4 flex-grow leading-relaxed">
+                      {journal.summary || (journal.messages.length > 0 ? journal.messages[0].content : "Empty entry")}
+                    </p>
+
+                    {/* Emotion and Distortion Badges */}
+                    {journal.emotions && journal.emotions.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 mb-3 w-full">
+                        {journal.emotions.slice(0, 2).map((emo) => (
+                          <span
+                            key={emo.id || emo.name}
+                            className="text-[10px] px-2 py-0.5 rounded-md bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-500/20 font-medium"
+                          >
+                            {emo.name} ({emo.confidence}%)
+                          </span>
+                        ))}
+                        {journal.emotions.length > 2 && (
+                          <span className="text-[9px] text-[var(--text-faint)]">
+                            +{journal.emotions.length - 2}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {journal.cbtDistortions && journal.cbtDistortions.length > 0 && (
+                      <div className="mb-3">
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/20 font-medium">
+                          ⚠️ {journal.cbtDistortions[0].type}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-[var(--text-faint)] mt-auto pt-2 border-t border-[var(--border-subtle)] w-full">
+                      <Sparkles className="w-3.5 h-3.5 text-violet-500 dark:text-violet-400" />
+                      <span>{journal.messages.length} reflections</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeletingJournalId(journal.id);
+                    }}
+                    className="absolute top-4 right-4 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all focus:opacity-100 z-10"
+                    title="Delete Entry"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               ))}
             </div>
           )}
         </div>
       </main>
+
+      {/* Delete Confirmation Modal */}
+      {deletingJournalId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-6 max-w-sm w-full shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 to-red-600" />
+            <div className="flex items-center gap-3 mb-4 text-red-500">
+              <AlertTriangle className="w-6 h-6" />
+              <h3 className="text-lg font-bold">Delete Entry?</h3>
+            </div>
+            <p className="text-[var(--text-muted)] text-sm mb-6 leading-relaxed">
+              This will permanently remove this reflection and its chat history from your encrypted vault. This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setDeletingJournalId(null)}
+                className="px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteJournal}
+                className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-500 rounded-xl transition-colors shadow-sm shadow-red-900/20"
+              >
+                Delete Permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

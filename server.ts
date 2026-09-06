@@ -27,7 +27,8 @@ async function startServer() {
   const PORT = 3000;
 
   // Middleware for JSON body parsing
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // Middleware for Authentication
   const authenticateUser = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -623,14 +624,14 @@ Output:
   // Emotion & CBT Distortion Analysis Endpoint
   app.post("/api/journal/analyze-emotion", authenticateUser, async (req, res) => {
     try {
-      const { text } = req.body;
-      if (!text || typeof text !== "string" || !text.trim()) {
-        return res.status(400).json({ error: "Text is required for emotion analysis" });
+      const { text, mediaBase64, mediaMimeType } = req.body;
+      if ((!text || typeof text !== "string" || !text.trim()) && !mediaBase64) {
+        return res.status(400).json({ error: "Text or media is required for emotion analysis" });
       }
 
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        return res.json(performFallbackEmotionAnalysis(text));
+        return res.json(performFallbackEmotionAnalysis(text || ""));
       }
 
       const ai = new GoogleGenAI({ apiKey });
@@ -642,12 +643,25 @@ Output:
 
       let responseText = "";
       let success = false;
+      
+      const contents = [];
+      if (text && text.trim()) {
+        contents.push(`Analyze the following journal entry text:\n"${text}"`);
+      } else {
+        contents.push(`Analyze the emotional context of the provided media.`);
+      }
+
+      if (mediaBase64 && mediaMimeType) {
+        contents.push({
+          inlineData: { mimeType: mediaMimeType, data: mediaBase64 }
+        });
+      }
 
       for (const model of models) {
         try {
           const response = await ai.models.generateContent({
             model: model,
-            contents: `Analyze the following journal entry text:\n"${text}"`,
+            contents: contents,
             config: {
               systemInstruction: EMOTION_CBT_SYSTEM_INSTRUCTION,
               responseMimeType: "application/json",
@@ -1548,8 +1562,13 @@ Produce a comprehensive, rigorous Weekly Performance Report formatted in JSON.`;
       } = req.body;
 
       // Check if user has paused insights
-      const settingsDoc = await db.collection("users").doc(userId).collection("agent").doc("config").get();
-      const currentSettings = settingsDoc.exists ? settingsDoc.data() : null;
+      let currentSettings: any = null;
+      try {
+        const settingsDoc = await db.collection("users").doc(userId).collection("agent").doc("config").get();
+        currentSettings = settingsDoc.exists ? settingsDoc.data() : null;
+      } catch (dbReadErr: any) {
+        console.warn("[Autonomous Agent] Server Firestore read notice:", dbReadErr?.message || dbReadErr);
+      }
 
       if (currentSettings?.isPaused && !forceRun) {
         if (!currentSettings.pauseUntil || currentSettings.pauseUntil > Date.now()) {
@@ -1577,14 +1596,18 @@ Produce a comprehensive, rigorous Weekly Performance Report formatted in JSON.`;
 
       if (cachedHash && cachedHash === currentHash && !forceRun && currentSettings?.lastScorecardId) {
         // Return cached notification to avoid redundant Gemini API consumption
-        const cachedDoc = await db.collection("users").doc(userId).collection("scorecards").doc(currentSettings.lastScorecardId).get();
-        if (cachedDoc.exists) {
-          return res.json({
-            success: true,
-            cached: true,
-            scorecard: cachedDoc.data(),
-            message: "Retrieved cached weekly synthesis (no new entry changes detected)."
-          });
+        try {
+          const cachedDoc = await db.collection("users").doc(userId).collection("scorecards").doc(currentSettings.lastScorecardId).get();
+          if (cachedDoc.exists) {
+            return res.json({
+              success: true,
+              cached: true,
+              scorecard: cachedDoc.data(),
+              message: "Retrieved cached weekly synthesis (no new entry changes detected)."
+            });
+          }
+        } catch (cacheReadErr: any) {
+          console.warn("[Autonomous Agent] Cached doc read skipped:", cacheReadErr?.message || cacheReadErr);
         }
       }
 
@@ -1752,27 +1775,31 @@ Respond STRICTLY with valid JSON following this exact schema.`;
 
       finalScorecard.deliveryChannelsSent = deliveredChannels;
 
-      // Save scorecard to Firestore
-      await db.collection("users").doc(userId).collection("scorecards").doc(finalScorecard.id).set(finalScorecard);
+      // Save scorecard to Firestore (safely try server-side write, client will also persist via Client SDK)
+      try {
+        await db.collection("users").doc(userId).collection("scorecards").doc(finalScorecard.id).set(finalScorecard);
 
-      // Update Agent Settings & Execution History
-      const executionRecord = {
-        timestamp: Date.now(),
-        status: 'success',
-        summary: finalScorecard.executiveSummary,
-        deliveredChannels: deliveredChannels
-      };
+        // Update Agent Settings & Execution History
+        const executionRecord = {
+          timestamp: Date.now(),
+          status: 'success',
+          summary: finalScorecard.executiveSummary,
+          deliveredChannels: deliveredChannels
+        };
 
-      const updatedHistory = [executionRecord, ...(currentSettings?.executionHistory || [])].slice(0, 15);
+        const updatedHistory = [executionRecord, ...(currentSettings?.executionHistory || [])].slice(0, 15);
 
-      await db.collection("users").doc(userId).collection("agent").doc("config").set({
-        ...currentSettings,
-        lastExecutedAt: Date.now(),
-        lastScorecardId: finalScorecard.id,
-        cachedAnalysisHash: currentHash,
-        executionHistory: updatedHistory,
-        updatedAt: Date.now()
-      }, { merge: true });
+        await db.collection("users").doc(userId).collection("agent").doc("config").set({
+          ...currentSettings,
+          lastExecutedAt: Date.now(),
+          lastScorecardId: finalScorecard.id,
+          cachedAnalysisHash: currentHash,
+          executionHistory: updatedHistory,
+          updatedAt: Date.now()
+        }, { merge: true });
+      } catch (dbSaveErr: any) {
+        console.warn("[Autonomous Agent] Server Firestore scorecard write skipped (saved by client SDK):", dbSaveErr?.message || dbSaveErr);
+      }
 
       res.json({
         success: true,
@@ -1791,39 +1818,49 @@ Respond STRICTLY with valid JSON following this exact schema.`;
   cron.schedule("0 8 * * 0", async () => {
     console.log("⏰ [Cloud Scheduler] Running Sunday 8:00 AM Autonomous Agent Habit Synthesis job...");
     try {
-      const usersSnapshot = await db.collection("users").get();
-      for (const userDoc of usersSnapshot.docs) {
+      let usersSnapshot: any;
+      try {
+        usersSnapshot = await db.collection("users").get();
+      } catch (uErr: any) {
+        console.warn("[Cloud Scheduler] Firestore user query skipped:", uErr?.message || uErr);
+        return;
+      }
+      for (const userDoc of (usersSnapshot?.docs || [])) {
         const userId = userDoc.id;
-        const agentDoc = await db.collection("users").doc(userId).collection("agent").doc("config").get();
-        if (agentDoc.exists && agentDoc.data()?.enabled) {
-          const config = agentDoc.data();
-          if (config.isPaused && (!config.pauseUntil || config.pauseUntil > Date.now())) {
-            console.log(`Skipping paused user ${userId}`);
-            continue;
+        try {
+          const agentDoc = await db.collection("users").doc(userId).collection("agent").doc("config").get();
+          if (agentDoc.exists && agentDoc.data()?.enabled) {
+            const config = agentDoc.data();
+            if (config.isPaused && (!config.pauseUntil || config.pauseUntil > Date.now())) {
+              console.log(`Skipping paused user ${userId}`);
+              continue;
+            }
+
+            // Fetch user's entries from past 7 days
+            const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+            const journalsSnapshot = await db.collection("users").doc(userId).collection("journals")
+              .where("updatedAt", ">=", sevenDaysAgo)
+              .get();
+
+            const entries = journalsSnapshot.docs.map(d => d.data());
+            if (entries.length < (config.minEntriesRequired || 1)) {
+              console.log(`User ${userId} has insufficient entries for autonomous synthesis (${entries.length})`);
+              continue;
+            }
+
+            const scorecard = generateFallbackScorecard(userId, entries);
+            scorecard.deliveryChannelsSent = ['in_app'];
+
+            if (config.deliveryChannels?.discord && config.discordWebhookUrl) {
+              const ok = await sendDiscordScorecard(config.discordWebhookUrl, scorecard);
+              if (ok) scorecard.deliveryChannelsSent.push('discord');
+            }
+
+            await db.collection("users").doc(userId).collection("scorecards").doc(scorecard.id).set(scorecard);
+            console.log(`✅ [Cloud Scheduler] Scorecard created & delivered for user ${userId}`);
           }
-
-          // Fetch user's entries from past 7 days
-          const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-          const journalsSnapshot = await db.collection("users").doc(userId).collection("journals")
-            .where("updatedAt", ">=", sevenDaysAgo)
-            .get();
-
-          const entries = journalsSnapshot.docs.map(d => d.data());
-          if (entries.length < (config.minEntriesRequired || 1)) {
-            console.log(`User ${userId} has insufficient entries for autonomous synthesis (${entries.length})`);
-            continue;
-          }
-
-          const scorecard = generateFallbackScorecard(userId, entries);
-          scorecard.deliveryChannelsSent = ['in_app'];
-
-          if (config.deliveryChannels?.discord && config.discordWebhookUrl) {
-            const ok = await sendDiscordScorecard(config.discordWebhookUrl, scorecard);
-            if (ok) scorecard.deliveryChannelsSent.push('discord');
-          }
-
-          await db.collection("users").doc(userId).collection("scorecards").doc(scorecard.id).set(scorecard);
-          console.log(`✅ [Cloud Scheduler] Scorecard created & delivered for user ${userId}`);
+        } catch (singleUserErr: any) {
+          console.warn(`[Cloud Scheduler] Synthesis skipped for user ${userId}:`, singleUserErr?.message || singleUserErr);
         }
       }
     } catch (cronErr) {
@@ -2092,7 +2129,11 @@ ${task.suggestedApiEndpoints.map((ep: string) => `- \`${ep}\``).join('\n')}
               }
             };
 
-            await db.collection("users").doc(userId).collection("dev_tasks").doc(task.id).set(dispatchedRecord, { merge: true });
+            try {
+              await db.collection("users").doc(userId).collection("dev_tasks").doc(task.id).set(dispatchedRecord, { merge: true });
+            } catch (dbTaskErr: any) {
+              console.warn("[PM Dispatcher] Firestore task save notice (persisted via client SDK):", dbTaskErr?.message || dbTaskErr);
+            }
 
             return res.json({
               success: true,
@@ -2126,7 +2167,11 @@ ${task.suggestedApiEndpoints.map((ep: string) => `- \`${ep}\``).join('\n')}
               dispatchedAt: Date.now()
             }
           };
-          await db.collection("users").doc(userId).collection("dev_tasks").doc(task.id).set(dispatchedRecord, { merge: true });
+          try {
+            await db.collection("users").doc(userId).collection("dev_tasks").doc(task.id).set(dispatchedRecord, { merge: true });
+          } catch (dbTaskErr: any) {
+            console.warn("[PM Dispatcher] Firestore task save notice (persisted via client SDK):", dbTaskErr?.message || dbTaskErr);
+          }
 
           return res.json({
             success: true,
@@ -2222,9 +2267,79 @@ ${task.suggestedApiEndpoints.map((ep: string) => `- \`${ep}\``).join('\n')}
   });
 
   // Gemini API Endpoint
+  // Semantic Search / Ask Journal
+  app.post("/api/journal/ask", authenticateUser, async (req, res) => {
+    try {
+      const { query, entries } = req.body;
+      if (!query || !entries || !Array.isArray(entries)) {
+        return res.status(400).json({ error: "Invalid payload: missing query or entries array." });
+      }
+
+      if (entries.length === 0) {
+        return res.json({ answer: "You don't have any journal entries to search yet.", relevantEntryIds: [] });
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "GEMINI_API_KEY is not configured" });
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+
+      // Cap the number of entries to prevent exceeding context window for simple implementation
+      // We take the most recent 100 entries if there are too many.
+      const entriesToProcess = entries.slice(0, 100);
+
+      // We explicitly instruct the model to only use the provided context to prevent hallucinations.
+      const prompt = `You are a Semantic Search and Q&A AI embedded within a secure personal journaling application.
+The user is searching their own past journal entries.
+
+User Query: "${query}"
+
+Below is a serialized list of the user's decrypted journal entries. 
+Review the entries and provide a conversational, helpful, and empathetic answer based ONLY on the provided context.
+If the query asks for specific times or events (e.g., "when did I feel proud"), find those entries and summarize them.
+If no entries match the query, politely inform the user.
+
+You MUST return your response as a valid JSON object matching exactly this schema:
+{
+  "answer": "A conversational response answering the user's query in 2-4 sentences. Do not use markdown code blocks in this field, just plain text with basic markdown (bold/italic) if needed.",
+  "relevantEntryIds": ["id1", "id2"] // Array of string IDs for the journal entries that are most relevant to the query. Leave empty if none match.
+}
+
+CRITICAL: Return ONLY valid JSON.
+
+=== USER's JOURNAL ENTRIES ===
+${entriesToProcess.map((e: any) => `[ID: ${e.id}]\nDate: ${e.date}\nTitle: ${e.title}\nSummary: ${e.summary}\nContent:\n${e.text}`).join('\n\n---\n\n')}
+`;
+
+      const result = await ai.models.generateContent({
+        model: "gemini-3.8-flash",
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          temperature: 0.2, // Low temperature for more factual retrieval
+        }
+      });
+
+      const responseText = result.text || "{}";
+      try {
+        const parsed = JSON.parse(responseText.trim());
+        res.json(parsed);
+      } catch (parseErr) {
+        console.error("Failed to parse Ask Journal JSON response:", responseText);
+        res.status(500).json({ error: "Failed to parse AI response" });
+      }
+
+    } catch (error) {
+      console.error("Ask Journal error:", error);
+      res.status(500).json({ error: "Internal server error during semantic search" });
+    }
+  });
+
   app.post("/api/journal/chat", authenticateUser, async (req, res) => {
     try {
-      const { systemPrompt, message, history } = req.body;
+      const { systemPrompt, message, history, mediaBase64, mediaMimeType } = req.body;
       
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
@@ -2251,6 +2366,17 @@ ${task.suggestedApiEndpoints.map((ep: string) => `- \`${ep}\``).join('\n')}
 
         for (let i = 0; i < retries; i++) {
           try {
+            const userParts: any[] = [];
+            if (message && message.trim()) {
+                userParts.push({ text: message });
+            }
+            if (mediaBase64 && mediaMimeType) {
+                userParts.push({ inlineData: { mimeType: mediaMimeType, data: mediaBase64 } });
+            }
+            if (userParts.length === 0) {
+                userParts.push({ text: "Hello" });
+            }
+
             const result = await ai.models.generateContent({
               model: model,
               contents: [
@@ -2258,7 +2384,7 @@ ${task.suggestedApiEndpoints.map((ep: string) => `- \`${ep}\``).join('\n')}
                   role: msg.role === 'model' ? 'model' : 'user',
                   parts: [{ text: msg.content }]
                 })),
-                { role: 'user', parts: [{ text: message }] }
+                { role: 'user', parts: userParts }
               ],
               config: {
                  systemInstruction: systemPrompt || "You are a helpful, empathetic journaling assistant.",
@@ -2437,15 +2563,41 @@ ${task.suggestedApiEndpoints.map((ep: string) => `- \`${ep}\``).join('\n')}
       server: { middlewareMode: true },
       appType: "spa",
     });
+    
+    // Prevent Vite SPA fallback from intercepting unhandled API requests
+    app.use((req, res, next) => {
+      if (req.path.startsWith('/api/')) {
+        res.status(404).json({ error: "API route not found" });
+      } else {
+        next();
+      }
+    });
+    
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     // Support React Router HTML5 History API fallback
-    app.get("*", (req, res) => {
+    app.get("*", (req, res, next) => {
+      if (req.path.startsWith("/api/")) {
+        return res.status(404).json({ error: "API route not found" });
+      }
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  // Global error handler for API routes to always return JSON
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (req.path.startsWith('/api/')) {
+      console.error("API Error:", err);
+      res.status(err.status || 500).json({
+        error: err.message || "Internal Server Error",
+        status: err.status || 500
+      });
+    } else {
+      next(err);
+    }
+  });
 
   // Admin Cron Job: Global Sentiment Analysis (runs daily at 2 AM)
   cron.schedule("0 2 * * *", async () => {
@@ -2531,12 +2683,16 @@ ${task.suggestedApiEndpoints.map((ep: string) => `- \`${ep}\``).join('\n')}
         return;
       }
       if (analysisText) {
-        await db.collection("global_analytics").add({
-          timestamp: Date.now(),
-          analysis: analysisText,
-          entryCount: entries.length
-        });
-        console.log("Global Sentiment Analysis saved successfully to global_analytics collection.");
+        try {
+          await db.collection("global_analytics").add({
+            timestamp: Date.now(),
+            analysis: analysisText,
+            entryCount: entries.length
+          });
+          console.log("Global Sentiment Analysis saved successfully to global_analytics collection.");
+        } catch (dbAnalyticsErr: any) {
+          console.warn("[Admin Cron] Global analytics write skipped:", dbAnalyticsErr?.message || dbAnalyticsErr);
+        }
       }
     } catch (error) {
       console.error("Error running sentiment cron job:", error);

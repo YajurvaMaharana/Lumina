@@ -3,6 +3,7 @@ import { ArrowLeft, Loader2, TrendingUp, BarChart2, Calendar } from 'lucide-reac
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import ThemeToggle from './ThemeToggle';
+import ProfileDropdown from './ProfileDropdown';
 
 interface AdminDashboardProps {
   onBack: () => void;
@@ -77,8 +78,9 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
             </h2>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3.5">
           <ThemeToggle />
+          <ProfileDropdown />
         </div>
       </header>
 
