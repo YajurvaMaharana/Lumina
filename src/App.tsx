@@ -21,11 +21,13 @@ function AppContent() {
   const [view, setView] = useState<'dashboard' | 'admin' | 'journal'>('dashboard');
   const [selectedJournalId, setSelectedJournalId] = useState<string | null>(null);
   const [hasPassword, setHasPassword] = useState(false);
+  const [justUnlocked, setJustUnlocked] = useState(false);
 
   useEffect(() => {
     if (!user) {
       clearPassword();
       setHasPassword(false);
+      setJustUnlocked(false);
     } else {
       setHasPassword(!!getPassword());
     }
@@ -35,9 +37,6 @@ function AppContent() {
 
   return (
     <div className="relative min-h-screen bg-[var(--bg-primary)] overflow-x-hidden">
-      {/* Global Startup Intro Splash Animation on Initial Boot across Login & Dashboard */}
-      <StartupIntro />
-
       {/* Full-viewport Aurora WebGL Background Layer */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <Aurora
@@ -55,6 +54,7 @@ function AppContent() {
             onSelectJournal={() => {}} 
             onOpenAdmin={() => {}} 
             onLockVault={() => {}} 
+            playEntranceAnimation={true}
           />
         ) : loading ? (
           <div className="flex items-center justify-center min-h-screen text-[var(--text-secondary)]">
@@ -63,7 +63,12 @@ function AppContent() {
         ) : !user ? (
           <Login />
         ) : !hasPassword ? (
-          <PassphrasePrompt onSet={() => setHasPassword(true)} />
+          <PassphrasePrompt 
+            onSet={() => {
+              setHasPassword(true);
+              setJustUnlocked(true);
+            }} 
+          />
         ) : view === 'admin' ? (
           <AdminDashboard onBack={() => setView('dashboard')} />
         ) : view === 'journal' && selectedJournalId ? (
@@ -81,7 +86,12 @@ function AppContent() {
               setView('journal');
             }} 
             onOpenAdmin={() => setView('admin')}
-            onLockVault={() => setHasPassword(false)}
+            onLockVault={() => {
+              setHasPassword(false);
+              setJustUnlocked(false);
+            }}
+            playEntranceAnimation={justUnlocked}
+            onEntranceAnimationComplete={() => setJustUnlocked(false)}
           />
         )}
       </div>

@@ -24,6 +24,8 @@ interface DashboardProps {
   onSelectJournal: (journalId: string | 'new') => void;
   onOpenAdmin: () => void;
   onLockVault?: () => void;
+  playEntranceAnimation?: boolean;
+  onEntranceAnimationComplete?: () => void;
 }
 
 interface SharedEntryNotification {
@@ -34,7 +36,13 @@ interface SharedEntryNotification {
   createdAt: number;
 }
 
-export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }: DashboardProps) {
+export default function Dashboard({
+  onSelectJournal,
+  onOpenAdmin,
+  onLockVault,
+  playEntranceAnimation = false,
+  onEntranceAnimationComplete,
+}: DashboardProps) {
   const { user, isAdmin } = useAuth();
   const [journals, setJournals] = useState<Journal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +59,36 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
 
   // Hover state for interactive expanding navigation items
   const [hoveredTab, setHoveredTab] = useState<string | null>(null);
+
+  // Post-unlock entrance animation state: 'splash' -> 'gliding' -> 'ready'
+  const [introPhase, setIntroPhase] = useState<'splash' | 'gliding' | 'ready'>(
+    playEntranceAnimation ? 'splash' : 'ready'
+  );
+
+  useEffect(() => {
+    if (!playEntranceAnimation) {
+      setIntroPhase('ready');
+      return;
+    }
+
+    setIntroPhase('splash');
+
+    // Hold centered for 1.4 seconds, then smoothly glide up into header position
+    const glideTimer = setTimeout(() => {
+      setIntroPhase('gliding');
+    }, 1400);
+
+    // Hand off to permanent header logo at 2.5 seconds
+    const readyTimer = setTimeout(() => {
+      setIntroPhase('ready');
+      if (onEntranceAnimationComplete) onEntranceAnimationComplete();
+    }, 2500);
+
+    return () => {
+      clearTimeout(glideTimer);
+      clearTimeout(readyTimer);
+    };
+  }, [playEntranceAnimation, onEntranceAnimationComplete]);
 
   useEffect(() => {
     if (user) {
@@ -228,6 +266,46 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
   return (
     <div className="w-full min-h-screen bg-transparent text-[var(--text-secondary)] font-sans relative overflow-x-hidden flex flex-col transition-colors duration-200">
       <div className="absolute inset-0 atmosphere pointer-events-none opacity-30"></div>
+
+      {/* Post-Unlock Entrance Animation: Centered splash smoothly gliding into top-left header */}
+      {introPhase !== 'ready' && (
+        <div className="fixed inset-0 z-50 pointer-events-none">
+          {/* Dimmed frosted backdrop during initial splash, smoothly fades out during glide */}
+          <div
+            className={`absolute inset-0 bg-[#05070A]/85 backdrop-blur-md transition-opacity duration-1000 ease-out ${
+              introPhase === 'splash' ? 'opacity-100' : 'opacity-0'
+            }`}
+          />
+
+          {/* Gliding Neural Orbit + Lumina branding group */}
+          <div
+            className={`fixed z-50 transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] h-20 flex items-center ${
+              introPhase === 'splash'
+                ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 scale-125 sm:scale-135'
+                : 'top-0 left-4 sm:left-6 lg:left-8 translate-x-0 translate-y-0 scale-100'
+            }`}
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="relative flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full bg-violet-600/25 blur-xl animate-pulse" />
+                <NeuralOrbit size={introPhase === 'splash' ? 52 : 36} />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight glow-text text-white drop-shadow-md">
+                  Lumina
+                </h1>
+                <p
+                  className={`text-[10px] uppercase tracking-widest text-violet-400 font-mono transition-opacity duration-500 ${
+                    introPhase === 'splash' ? 'opacity-100' : 'opacity-0'
+                  }`}
+                >
+                  Neural Cognitive Journal
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Top Header with Unified Logo, Curved Expanding Navigation Bar, and Actions */}
       <header className="sticky top-0 z-30 h-20 w-full flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-[var(--border-color)] shrink-0 glass bg-[var(--header-glass-bg)]">
@@ -235,7 +313,9 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
         <div className="flex items-center gap-3 sm:gap-5 min-w-0 flex-1 mr-2">
           {/* Logo & Brand Name */}
           <div
-            className="flex items-center gap-2.5 shrink-0 cursor-pointer group"
+            className={`flex items-center gap-2.5 shrink-0 cursor-pointer group transition-opacity duration-300 ${
+              introPhase === 'ready' ? 'opacity-100' : 'opacity-0'
+            }`}
             onClick={() => setActiveTab('entries')}
             title="Lumina Home"
           >
@@ -248,7 +328,9 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
           {/* Sleek, curved, fully rounded glassmorphic navigation container */}
           <nav
             aria-label="Dashboard sections"
-            className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-card)]/85 backdrop-blur-xl border border-[var(--border-color)] shadow-inner overflow-x-auto no-scrollbar max-w-full"
+            className={`flex items-center gap-1 p-1 rounded-full bg-[var(--bg-card)]/85 backdrop-blur-xl border border-[var(--border-color)] shadow-inner overflow-x-auto no-scrollbar max-w-full transition-opacity duration-700 ${
+              introPhase === 'splash' ? 'opacity-0' : 'opacity-100'
+            }`}
           >
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -300,7 +382,11 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
         </div>
 
         {/* Right Header Quick Actions */}
-        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div
+          className={`flex items-center gap-2 sm:gap-3 shrink-0 transition-opacity duration-700 ${
+            introPhase === 'splash' ? 'opacity-0' : 'opacity-100'
+          }`}
+        >
           {/* Ask Journal Quick Action */}
           <button
             onClick={() => setActiveTab('ask')}
@@ -336,7 +422,11 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
         </div>
       </header>
 
-      <main className="w-full flex-1 px-4 sm:px-6 lg:px-10 py-8 relative z-10">
+      <main
+        className={`w-full flex-1 px-4 sm:px-6 lg:px-10 py-8 relative z-10 transition-opacity duration-700 ${
+          introPhase === 'splash' ? 'opacity-0' : 'opacity-100'
+        }`}
+      >
         <div className="max-w-5xl w-full mx-auto space-y-8">
           {/* Section Heading & New Entry Action Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
