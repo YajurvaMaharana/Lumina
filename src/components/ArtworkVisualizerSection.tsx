@@ -15,7 +15,8 @@ import {
   Calendar,
   Smile,
   Activity,
-  Award
+  Award,
+  Lock
 } from 'lucide-react';
 import NeuralOrbit from './NeuralOrbit';
 import {
@@ -42,6 +43,7 @@ import {
   WordCloudItem,
   MOOD_PALETTES
 } from '../lib/artworkEngine';
+import { isEncryptedOrFailedEntry } from '../lib/sentimentEngine';
 import AbstractArtworkCanvas from './AbstractArtworkCanvas';
 import QuoteCardStudio from './QuoteCardStudio';
 import { useAuth } from '../lib/AuthContext';
@@ -69,13 +71,22 @@ export default function ArtworkVisualizerSection({
 
   const timelineChartRef = useRef<HTMLDivElement>(null);
 
-  // Synthesize artworks for journals that don't have stored artwork
+  // Filter decrypted readable journals and track protected/locked entries
+  const decryptedJournals = useMemo(() => {
+    return journals.filter(j => !isEncryptedOrFailedEntry(j));
+  }, [journals]);
+
+  const encryptedCount = useMemo(() => {
+    return journals.filter(j => isEncryptedOrFailedEntry(j)).length;
+  }, [journals]);
+
+  // Synthesize artworks for valid journals that don't have stored artwork
   const journalsWithArtwork = useMemo(() => {
-    return journals.map(j => ({
+    return decryptedJournals.map(j => ({
       ...j,
       artwork: proArtworkResults[j.id] || j.artwork || synthesizeLocalArtwork(j)
     }));
-  }, [journals, proArtworkResults]);
+  }, [decryptedJournals, proArtworkResults]);
 
   // Timeline points calculation
   const allTimelinePoints = useMemo(() => {
@@ -93,13 +104,13 @@ export default function ArtworkVisualizerSection({
 
   // Word cloud extraction
   const wordCloudData = useMemo(() => {
-    return extractWordCloud(journals);
-  }, [journals]);
+    return extractWordCloud(decryptedJournals);
+  }, [decryptedJournals]);
 
   // Theme Evolution
   const themeEvolutionData = useMemo(() => {
-    return analyzeThemeEvolution(journals);
-  }, [journals]);
+    return analyzeThemeEvolution(decryptedJournals);
+  }, [decryptedJournals]);
 
   // Filtered Gallery Artworks
   const filteredGallery = useMemo(() => {
@@ -170,17 +181,35 @@ export default function ArtworkVisualizerSection({
     }
   };
 
-  // Stats calculation
+  // Dynamic stats calculation
   const avgValence = useMemo(() => {
-    if (allTimelinePoints.length === 0) return 65;
+    if (allTimelinePoints.length === 0) return 0;
     const sum = allTimelinePoints.reduce((acc, p) => acc + p.valence, 0);
     return Math.round(sum / allTimelinePoints.length);
   }, [allTimelinePoints]);
 
   const positivePercent = useMemo(() => {
-    if (allTimelinePoints.length === 0) return 75;
+    if (allTimelinePoints.length === 0) return 0;
     const pos = allTimelinePoints.filter(p => p.valence > 0).length;
     return Math.round((pos / allTimelinePoints.length) * 100);
+  }, [allTimelinePoints]);
+
+  const trendInfo = useMemo(() => {
+    if (allTimelinePoints.length < 2) {
+      return { label: 'Baseline', icon: TrendingUp, color: 'text-violet-400', desc: 'Initial baseline trajectory recorded.' };
+    }
+    const half = Math.floor(allTimelinePoints.length / 2);
+    const firstHalfAvg = allTimelinePoints.slice(0, half).reduce((acc, p) => acc + p.valence, 0) / half;
+    const secondHalfAvg = allTimelinePoints.slice(half).reduce((acc, p) => acc + p.valence, 0) / (allTimelinePoints.length - half);
+    const diff = secondHalfAvg - firstHalfAvg;
+
+    if (diff > 6) {
+      return { label: 'Upward (+)', icon: TrendingUp, color: 'text-emerald-400', desc: 'Positive emotional momentum expanding.' };
+    } else if (diff < -6) {
+      return { label: 'Fluctuating', icon: Activity, color: 'text-amber-400', desc: 'Emotional friction undergoing cognitive reframing.' };
+    } else {
+      return { label: 'Steady State', icon: TrendingUp, color: 'text-sky-400', desc: 'Cognitive equilibrium and emotional consistency.' };
+    }
   }, [allTimelinePoints]);
 
   return (
@@ -429,8 +458,8 @@ export default function ArtworkVisualizerSection({
 
                 <button
                   onClick={handleExportTimelinePng}
-                  disabled={isExportingTimeline}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-white/80 transition-colors"
+                  disabled={isExportingTimeline || filteredTimelinePoints.length === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-white/80 transition-colors disabled:opacity-50"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>{isExportingTimeline ? 'Exporting...' : 'PNG'}</span>
@@ -438,63 +467,87 @@ export default function ArtworkVisualizerSection({
               </div>
             </div>
 
-            {/* Recharts Mood & Arousal Area Chart */}
+            {/* Encrypted Entries Exclusion Notice */}
+            {encryptedCount > 0 && (
+              <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-600 dark:text-amber-300">
+                <Lock className="w-4 h-4 text-amber-500 shrink-0" />
+                <span>
+                  <strong>{encryptedCount} protected/encrypted {encryptedCount === 1 ? 'entry is' : 'entries are'} excluded.</strong> Unlock your vault with your passphrase to evaluate their sentiment alongside your public reflections.
+                </span>
+              </div>
+            )}
+
+            {/* Recharts Mood & Arousal Area Chart or Empty State */}
             <div className="h-80 w-full pt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={filteredTimelinePoints} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="valenceGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.5} />
-                      <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.0} />
-                    </linearGradient>
-                    <linearGradient id="arousalGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#EC4899" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#EC4899" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#FFFFFF" strokeOpacity={0.05} />
-                  <XAxis dataKey="dateStr" stroke="#64748B" fontSize={11} tickLine={false} />
-                  <YAxis domain={[-100, 100]} stroke="#64748B" fontSize={11} tickLine={false} />
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-[#0B0F19] border border-white/20 p-3 rounded-xl shadow-2xl text-xs space-y-1">
-                            <div className="font-bold text-white">{data.title}</div>
-                            <div className="text-white/50 text-[10px]">{data.dateStr}</div>
-                            <div className="flex items-center gap-2 pt-1">
-                              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: data.emotionColor }} />
-                              <span className="text-violet-300 font-semibold">{data.primaryEmotion}</span>
+              {filteredTimelinePoints.length === 0 ? (
+                <div className="h-full w-full flex flex-col items-center justify-center text-center p-6 space-y-3 rounded-2xl bg-white/[0.02] border border-white/5">
+                  <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-violet-400">
+                    <Activity className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-base font-semibold text-white">No Decrypted Reflections in Range</h4>
+                  <p className="text-xs text-white/50 max-w-sm">
+                    Write reflections or unlock your vault with your passphrase to plot longitudinal emotional valence and intensity trajectories.
+                  </p>
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={filteredTimelinePoints} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="valenceGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.5} />
+                        <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="arousalGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#EC4899" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#EC4899" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#FFFFFF" strokeOpacity={0.05} />
+                    <XAxis dataKey="dateStr" stroke="#64748B" fontSize={11} tickLine={false} />
+                    <YAxis domain={[-100, 100]} stroke="#64748B" fontSize={11} tickLine={false} />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-[#0B0F19] border border-white/20 p-3 rounded-xl shadow-2xl text-xs space-y-1">
+                              <div className="font-bold text-white">{data.title}</div>
+                              <div className="text-white/50 text-[10px]">{data.dateStr}</div>
+                              <div className="flex items-center gap-2 pt-1">
+                                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: data.emotionColor }} />
+                                <span className="text-violet-300 font-semibold">{data.primaryEmotion}</span>
+                              </div>
+                              <div className={data.valence >= 0 ? "text-emerald-400 font-semibold" : "text-rose-400 font-semibold"}>
+                                Emotional Valence: {data.valence > 0 ? `+${data.valence}` : data.valence} pts
+                              </div>
+                              <div className="text-pink-400">Arousal / Energy: {data.arousal}/100</div>
                             </div>
-                            <div className="text-emerald-400">Emotional Valence: {data.valence > 0 ? `+${data.valence}` : data.valence}</div>
-                            <div className="text-pink-400">Arousal / Energy: {data.arousal}/100</div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="valence"
-                    name="Emotional Valence"
-                    stroke="#8B5CF6"
-                    strokeWidth={3}
-                    fillOpacity={1}
-                    fill="url(#valenceGrad)"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="movingAverageValence"
-                    name="Smoothed Trend"
-                    stroke="#38BDF8"
-                    strokeWidth={2}
-                    strokeDasharray="4 4"
-                    dot={false}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="valence"
+                      name="Emotional Valence"
+                      stroke="#8B5CF6"
+                      strokeWidth={3}
+                      fillOpacity={1}
+                      fill="url(#valenceGrad)"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="movingAverageValence"
+                      name="Smoothed Trend"
+                      stroke="#38BDF8"
+                      strokeWidth={2}
+                      strokeDasharray="4 4"
+                      dot={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              )}
             </div>
 
             {/* Timeline Insights Summary */}
@@ -507,17 +560,19 @@ export default function ArtworkVisualizerSection({
 
               <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
                 <div className="text-xs text-white/40 mb-1">Average Polarity</div>
-                <div className="text-xl font-bold text-violet-400">+{avgValence} pts</div>
-                <p className="text-[11px] text-white/50 mt-1">Sustained positive growth sentiment.</p>
+                <div className="text-xl font-bold text-violet-400">
+                  {avgValence > 0 ? `+${avgValence}` : avgValence} pts
+                </div>
+                <p className="text-[11px] text-white/50 mt-1">Sustained net emotional trajectory.</p>
               </div>
 
               <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
                 <div className="text-xs text-white/40 mb-1">Long-term Trend</div>
-                <div className="text-xl font-bold text-sky-400 flex items-center gap-1">
-                  <TrendingUp className="w-5 h-5 text-sky-400" />
-                  <span>Upward</span>
+                <div className={`text-xl font-bold ${trendInfo.color} flex items-center gap-1.5`}>
+                  <trendInfo.icon className={`w-5 h-5 ${trendInfo.color}`} />
+                  <span>{trendInfo.label}</span>
                 </div>
-                <p className="text-[11px] text-white/50 mt-1">Cognitive clarity increasing over sessions.</p>
+                <p className="text-[11px] text-white/50 mt-1">{trendInfo.desc}</p>
               </div>
             </div>
           </div>

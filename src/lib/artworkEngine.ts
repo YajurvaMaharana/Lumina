@@ -1,4 +1,5 @@
 import { Journal, JournalArtwork, EmotionTag } from '../types';
+import { calculateJournalSentiment, isEncryptedOrFailedEntry } from './sentimentEngine';
 
 export interface MoodPalette {
   name: string;
@@ -146,12 +147,30 @@ export function getPaletteForEmotions(emotions?: EmotionTag[]): MoodPalette {
 
 // Generate or extract artwork metadata for a journal
 export function synthesizeLocalArtwork(journal: Journal): JournalArtwork {
-  const paletteObj = getPaletteForEmotions(journal.emotions);
-  const primaryMood = journal.emotions?.[0]?.name || 'Equilibrium';
+  // If entry failed decryption or is encrypted, return clean minimal fallback
+  if (isEncryptedOrFailedEntry(journal)) {
+    return {
+      style: 'minimalist_waveform',
+      primaryMood: 'Encrypted',
+      palette: ['#64748B', '#475569', '#334155'],
+      seed: 101,
+      complexity: 2,
+      valence: 0,
+      arousal: 0,
+      aiConcept: 'Protected cryptographic reflection.',
+      aiPrompt: 'Minimalist encrypted geometric cube.',
+      quoteSnippet: ''
+    };
+  }
+
+  // Calculate dynamic sentiment & emotional intensity from actual text and CBT indicators
+  const sentiment = calculateJournalSentiment(journal);
+  const primaryMood = journal.emotions?.[0]?.name || sentiment.dominantEmotion || 'Equilibrium';
+  const paletteObj = getPaletteForEmotions(journal.emotions) || MOOD_PALETTES[primaryMood] || DEFAULT_PALETTE;
   
   // Extract a memorable quote snippet from messages
   let quote = '';
-  const firstUserMsg = journal.messages.find(m => m.role === 'user')?.content || journal.summary || '';
+  const firstUserMsg = journal.messages?.find(m => m.role === 'user')?.content || journal.summary || '';
   if (firstUserMsg) {
     const sentences = firstUserMsg
       .replace(/[\n\r]+/g, ' ')
@@ -168,7 +187,7 @@ export function synthesizeLocalArtwork(journal: Journal): JournalArtwork {
   }
 
   // Calculate complexity from content length and emotion count
-  const wordCount = (journal.messages.map(m => m.content).join(' ')).split(/\s+/).length;
+  const wordCount = ((journal.messages || []).map(m => m.content).join(' ')).split(/\s+/).length;
   const complexity = Math.min(10, Math.max(2, Math.floor(wordCount / 30) + (journal.emotions?.length || 1)));
 
   return {
@@ -177,8 +196,8 @@ export function synthesizeLocalArtwork(journal: Journal): JournalArtwork {
     palette: paletteObj.colors,
     seed,
     complexity,
-    valence: paletteObj.valence,
-    arousal: paletteObj.arousal,
+    valence: sentiment.valence,
+    arousal: sentiment.arousal,
     aiConcept: `An abstract exploration of ${primaryMood.toLowerCase()}, weaving harmonic color chords of ${paletteObj.name}.`,
     aiPrompt: `Abstract expressionist fine art capturing ${primaryMood} and emotional state, flowing volumetric liquid gradients in ${paletteObj.colors.join(', ')}, golden ratio geometric harmony, cinematic diffused lighting, 8k resolution, minimalist modern museum aesthetic.`,
     quoteSnippet: quote
@@ -231,10 +250,11 @@ const FOCUS_MARKERS = new Set([
 ]);
 
 export function extractWordCloud(journals: Journal[]): WordCloudItem[] {
+  const valid = journals.filter(j => !isEncryptedOrFailedEntry(j));
   const wordMap = new Map<string, { count: number; journals: Set<string> }>();
 
-  journals.forEach(j => {
-    const text = (j.title + ' ' + j.messages.map(m => m.content).join(' ')).toLowerCase();
+  valid.forEach(j => {
+    const text = (j.title + ' ' + (j.messages || []).map(m => m.content).join(' ')).toLowerCase();
     const cleanWords = text.replace(/[^a-zA-Z\s]/g, ' ').split(/\s+/);
 
     cleanWords.forEach(w => {
@@ -296,16 +316,29 @@ export interface MoodTimelinePoint {
 }
 
 export function buildMoodTimeline(journals: Journal[]): MoodTimelinePoint[] {
-  const sorted = [...journals].sort((a, b) => a.createdAt - b.createdAt);
+  // Gracefully exclude locked or failed decryption entries to avoid flat 0 or default values
+  const valid = journals.filter(j => !isEncryptedOrFailedEntry(j));
+  if (valid.length === 0) return [];
+
+  const sorted = [...valid].sort((a, b) => a.createdAt - b.createdAt);
   
   const points: MoodTimelinePoint[] = [];
   let runningValenceSum = 0;
 
   sorted.forEach((j, index) => {
-    const palette = getPaletteForEmotions(j.emotions);
-    const primaryEmotion = j.emotions?.[0]?.name || 'Equilibrium';
-    const valence = j.artwork?.valence ?? palette.valence;
-    const arousal = j.artwork?.arousal ?? palette.arousal;
+    // Dynamically evaluate sentiment from actual text content, messages, and emotional metadata
+    const sentiment = calculateJournalSentiment(j);
+    const primaryEmotion = j.emotions?.[0]?.name || sentiment.dominantEmotion || 'Equilibrium';
+    const palette = getPaletteForEmotions(j.emotions) || MOOD_PALETTES[primaryEmotion] || DEFAULT_PALETTE;
+    
+    // Check if journal has an explicit custom artwork valence, otherwise use the dynamically computed sentiment score
+    const valence = typeof j.artwork?.valence === 'number' && j.artwork.valence !== 5 && j.artwork.valence !== 0
+      ? j.artwork.valence
+      : sentiment.valence;
+      
+    const arousal = typeof j.artwork?.arousal === 'number' && j.artwork.arousal !== 35 && j.artwork.arousal !== 0
+      ? j.artwork.arousal
+      : sentiment.arousal;
 
     runningValenceSum += valence;
     const movingAverageValence = Math.round(runningValenceSum / (index + 1));
@@ -381,6 +414,8 @@ const THEME_DEFINITIONS = [
 ];
 
 export function analyzeThemeEvolution(journals: Journal[]): ThemeCategoryData[] {
+  const valid = journals.filter(j => !isEncryptedOrFailedEntry(j));
+
   return THEME_DEFINITIONS.map(def => {
     let count = 0;
     let totalSentiment = 0;
@@ -388,14 +423,14 @@ export function analyzeThemeEvolution(journals: Journal[]): ThemeCategoryData[] 
 
     const recentCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
-    journals.forEach(j => {
-      const text = (j.title + ' ' + j.messages.map(m => m.content).join(' ')).toLowerCase();
+    valid.forEach(j => {
+      const text = (j.title + ' ' + (j.messages || []).map(m => m.content).join(' ')).toLowerCase();
       const hasMatch = def.keywords.some(k => text.includes(k));
 
       if (hasMatch) {
         count += 1;
-        const pal = getPaletteForEmotions(j.emotions);
-        totalSentiment += pal.valence;
+        const sentiment = calculateJournalSentiment(j);
+        totalSentiment += sentiment.valence;
 
         if (j.createdAt > recentCutoff) {
           recentHits += 1;

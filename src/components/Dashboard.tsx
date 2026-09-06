@@ -94,6 +94,118 @@ export default function Dashboard({
   useEffect(() => {
     if (user) {
       loadJournals();
+    } else {
+      // In dev preview mode or when not logged in, provide demonstration mock journals
+      const isDevPreview = typeof window !== 'undefined' && window.location.search.includes('preview=dashboard');
+      if (isDevPreview) {
+        const now = Date.now();
+        const DAY = 86400000;
+        const demoJournals: Journal[] = [
+          {
+            id: 'demo-1',
+            userId: 'preview-user',
+            createdAt: now - DAY * 14,
+            updatedAt: now - DAY * 14,
+            title: 'Breakthrough in Cognitive Architecture',
+            summary: 'Significant engineering milestone achieved today with high clarity and joy.',
+            messages: [
+              {
+                id: 'm1',
+                role: 'user',
+                content: 'Today was incredible. We solved the deep neural synchronization challenge and launched the system. I feel energetic, inspired, and proud of our breakthrough.',
+                timestamp: now - DAY * 14
+              }
+            ],
+            emotions: [{ id: 'e1', name: 'Joy', confidence: 85 }, { id: 'e2', name: 'Clarity', confidence: 80 }]
+          },
+          {
+            id: 'demo-2',
+            userId: 'preview-user',
+            createdAt: now - DAY * 10,
+            updatedAt: now - DAY * 10,
+            title: 'Anxious Evening & Work Overload',
+            summary: 'Struggled with fatigue, cognitive exhaustion and acute frustration.',
+            messages: [
+              {
+                id: 'm2',
+                role: 'user',
+                content: 'Feeling overwhelmed and depleted. Too many conflicting demands and unexpected outages caused severe stress and worry. Need sleep and peace.',
+                timestamp: now - DAY * 10
+              }
+            ],
+            emotions: [{ id: 'e3', name: 'Anxiety', confidence: 75 }, { id: 'e4', name: 'Fatigue', confidence: 70 }]
+          },
+          {
+            id: 'demo-3',
+            userId: 'preview-user',
+            createdAt: now - DAY * 7,
+            updatedAt: now - DAY * 7,
+            title: 'Quiet Restoration by the Coast',
+            summary: 'Grounded meditation and gentle pacing restored inner peace.',
+            messages: [
+              {
+                id: 'm3',
+                role: 'user',
+                content: 'Spent the morning walking along the shore. Felt deeply calm, grounded, and peaceful. Grateful for this quiet stillness and reflection.',
+                timestamp: now - DAY * 7
+              }
+            ],
+            emotions: [{ id: 'e5', name: 'Calm', confidence: 80 }, { id: 'e6', name: 'Gratitude', confidence: 75 }]
+          },
+          {
+            id: 'demo-4',
+            userId: 'preview-user',
+            createdAt: now - DAY * 5,
+            updatedAt: now - DAY * 5,
+            title: '🔒 Encrypted Reflection in Vault',
+            summary: '',
+            messages: [],
+            encryptedPayload: {
+              ciphertext: 'mockCiphertextLuminaZeroKnowledgeVault',
+              salt: 'mockSalt',
+              iv: 'mockIv'
+            }
+          },
+          {
+            id: 'demo-5',
+            userId: 'preview-user',
+            createdAt: now - DAY * 3,
+            updatedAt: now - DAY * 3,
+            title: 'Team Misalignment and Friction',
+            summary: 'Interpersonal tension and feeling misunderstood during design review.',
+            messages: [
+              {
+                id: 'm5',
+                role: 'user',
+                content: 'Had a frustrating meeting where requirements were dismissed. Felt irritated and discouraged by the lack of empathy and closed attitudes.',
+                timestamp: now - DAY * 3
+              }
+            ],
+            emotions: [{ id: 'e7', name: 'Frustration', confidence: 65 }]
+          },
+          {
+            id: 'demo-6',
+            userId: 'preview-user',
+            createdAt: now - DAY * 1,
+            updatedAt: now - DAY * 1,
+            title: 'Triumphant Launch & Creative Flow',
+            summary: 'Exhilarating finish to the sprint with outstanding reception.',
+            messages: [
+              {
+                id: 'm6',
+                role: 'user',
+                content: 'Unbelievable momentum today! Shipped the fluid interface and the feedback from early testers is phenomenal. Celebrating with gratitude and optimism.',
+                timestamp: now - DAY * 1
+              }
+            ],
+            emotions: [{ id: 'e8', name: 'Triumph', confidence: 90 }, { id: 'e9', name: 'Optimism', confidence: 85 }]
+          }
+        ];
+        setJournals(demoJournals);
+        setLoading(false);
+      } else {
+        setLoading(false);
+      }
     }
   }, [user]);
 
