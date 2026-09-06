@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Send, Sparkles, Save, Mic, MicOff, ShieldAlert, Palette, Paperclip, X, MapPin, ChevronDown, UserCog, Share2 } from 'lucide-react';
+import { GoogleGenAI } from '@google/genai';
 import NeuralOrbit, { NeuralOrbitLoader } from './NeuralOrbit';
 import { useAuth } from '../lib/AuthContext';
 import { getJournal, saveJournal, extractTagsFromText, fetchCollaborativeConnections, publishSharedEntry } from '../lib/db';
@@ -74,6 +75,30 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const sessionInitializedIdRef = useRef<string | null>(null);
+
+  // Persistent SDK chat session reference for AI mentor
+  const chatSessionRef = useRef<any>(null);
+
+  // Initialize a persistent chat session when entering the mentor view using the SDK's chat helper
+  useEffect(() => {
+    try {
+      const apiKey = (typeof process !== 'undefined' && process.env?.VITE_GEMINI_API_KEY) ||
+        ((import.meta as any).env?.VITE_GEMINI_API_KEY) || '';
+      if (apiKey) {
+        const ai = new GoogleGenAI({ apiKey });
+        // Create a persistent chat instance with system instructions
+        const chat = ai.chats.create({
+          model: 'gemini-2.5-flash',
+          config: {
+            systemInstruction: "You are an empathetic AI mentor. Have a natural, flowing conversation with the user based on their reflections, without repeating introductory template phrases on every turn."
+          }
+        });
+        chatSessionRef.current = chat;
+      }
+    } catch (err) {
+      console.warn("[JournalView] Direct SDK chat session initialization skipped:", err);
+    }
+  }, [activePersona]);
 
   // Active 15-minute countdown interval
   useEffect(() => {
@@ -327,14 +352,20 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
 
       if (response.ok) {
         const data = await response.json();
-        const updatedJournal: Journal = {
-          ...currentJournal,
-          emotions: data.emotions || [],
-          cbtDistortions: data.cbtDistortions || []
-        };
-        setJournal(updatedJournal);
-        // Persist with encryption to Firestore
-        await saveJournal(user.uid, updatedJournal);
+        setJournal(prev => {
+          if (!prev) return null;
+          const updatedJournal: Journal = {
+            ...prev,
+            emotions: data.emotions || prev.emotions || [],
+            cbtDistortions: data.cbtDistortions || prev.cbtDistortions || []
+          };
+          if (user) {
+            saveJournal(user.uid, updatedJournal).catch(err => {
+              console.error('Failed to save journal emotions:', err);
+            });
+          }
+          return updatedJournal;
+        });
       }
     } catch (err) {
       console.error('Failed to analyze emotion:', err);
@@ -654,10 +685,35 @@ Entry Notes: ${tradeNote}`
     try {
       const idToken = user ? await user.getIdToken() : '';
       
-      const isInitialTurn = !journal || !journal.messages || journal.messages.length === 0;
+      // Determine if this is the initial turn by checking for ANY prior model/assistant response in the conversation
+      // updatedMessages = [...journal.messages, latestUserMessage] so it contains the full truth of the conversation
+      const hasPriorAIResponse = updatedMessages.some(msg => msg.role === 'model' || (msg as any).sender === 'assistant');
+      const isInitialTurn = !hasPriorAIResponse;
 
-      const systemPrompt = isInitialTurn
-        ? `You are an insightful journaling mentor acting strictly as the "${PERSONAS[activePersona].name}".
+      // Build the full conversation history array with { role, parts } and { sender, text } for both Gemini and server compatibility
+      const fullConversationHistory = updatedMessages.map(msg => {
+        const isModel = msg.role === 'model' || (msg as any).sender === 'assistant' || (msg as any).sender === 'model';
+        const role = isModel ? 'model' : 'user';
+        const sender = isModel ? 'assistant' : 'user';
+        const text = msg.content || '';
+        const parts = msg.mediaBase64 && msg.mediaMimeType
+          ? [{ text }, { inlineData: { mimeType: msg.mediaMimeType, data: msg.mediaBase64 } }]
+          : [{ text }];
+
+        return {
+          role,
+          sender,
+          text,
+          content: text,
+          parts
+        };
+      });
+
+      // System prompt is ONLY sent on the very first turn when no AI response exists yet.
+      // On follow-up turns, systemPrompt is explicitly undefined so the server handles conversational continuations.
+      let systemPromptPayload: string | undefined = undefined;
+      if (isInitialTurn) {
+        systemPromptPayload = `You are an insightful journaling mentor acting strictly as the "${PERSONAS[activePersona].name}".
 Core Philosophy & Style: ${PERSONAS[activePersona].prompt}
 
 CRITICAL RULES FOR OPENING REFLECTION:
@@ -665,43 +721,58 @@ CRITICAL RULES FOR OPENING REFLECTION:
 - Respond consistently in the distinctive style and tone of the "${PERSONAS[activePersona].name}".
 - Avoid generic platitudes. Provide focused, actionable, and perceptive mentorship.
 ${journal?.location ? `- The user is currently writing from: ${journal.location}. Consider this in context.` : ''} 
-- Keep your response concise (1-2 paragraphs), finishing with a thoughtful follow-up question.`
-        : `You are in an active ongoing mentoring dialogue acting strictly as the "${PERSONAS[activePersona].name}".
-Core Philosophy & Style: ${PERSONAS[activePersona].prompt}
-
-CRITICAL RULES FOR FOLLOW-UP REPLIES:
-- This is an active follow-up turn in an existing conversation. The initial greeting and reflection have ALREADY been delivered in prior turns.
-- DO NOT repeat the initial greeting, welcoming prompt, or introductory boilerplate.
-- Directly address the user's specific response in the context of the previous conversation history.
-- Dig deeper into their thoughts, challenge or validate their reasoning according to your persona, and advance the conversation with a focused, progressive follow-up question.
-- Keep your reply concise (1-2 paragraphs) and engaging.`;
-
-      const response = await fetch('/api/journal/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(idToken && { 'Authorization': `Bearer ${idToken}` })
-        },
-        body: JSON.stringify({
-          message: userMessage.content,
-          persona: activePersona,
-          mediaBase64: currentMediaFile?.base64,
-          mediaMimeType: currentMediaFile?.mimeType,
-          history: journal?.messages || [], // Persistent full history prior to this turn
-          systemPrompt
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get AI response');
+- Keep your response concise (1-2 paragraphs), finishing with a thoughtful follow-up question.
+- Do NOT prefix your response with persona labels like "[Empathetic Friend Mode]" or "[Analytical Coach Mode]".
+- Do NOT start with "Reflecting on what you shared:" — just respond naturally.`;
       }
 
-      const data = await response.json();
+      console.log(`[JournalView] Sending chat request: isInitialTurn=${isInitialTurn}, historyLength=${fullConversationHistory.length}, hasPriorAI=${hasPriorAIResponse}`);
+
+      let replyText = "";
+
+      // When user submits a message: call chat session directly if initialized
+      if (chatSessionRef.current) {
+        try {
+          const userInput = userMessage.content;
+          const response = await chatSessionRef.current.sendMessage({ message: userInput });
+          replyText = response.text || "";
+        } catch (chatErr) {
+          console.warn("[JournalView] Direct chat session send failed, routing to backend proxy", chatErr);
+        }
+      }
+
+      // If direct chat session was not configured or had an issue, route through the authenticated backend proxy
+      if (!replyText) {
+        const response = await fetch('/api/journal/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(idToken && { 'Authorization': `Bearer ${idToken}` })
+          },
+          body: JSON.stringify({
+            message: userMessage.content,
+            history: fullConversationHistory,
+            fullHistory: fullConversationHistory,
+            persona: activePersona,
+            isInitialTurn,
+            mediaBase64: currentMediaFile?.base64,
+            mediaMimeType: currentMediaFile?.mimeType,
+            systemPrompt: systemPromptPayload
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to get AI response');
+        }
+
+        const data = await response.json();
+        replyText = data.text;
+      }
       
       const aiMessage: Message = {
         id: crypto.randomUUID(),
         role: 'model',
-        content: data.text,
+        content: replyText,
         timestamp: Date.now()
       };
 
@@ -728,8 +799,8 @@ CRITICAL RULES FOR FOLLOW-UP REPLIES:
           });
       }
 
-      // Concurrently run Granular Emotion & CBT Analysis on original user reflection
-      if (updatedMessages.length > 0) {
+      // Run Granular Emotion & CBT Analysis once on the initial reflection if not yet analyzed
+      if (isInitialTurn && (!finalJournal.emotions || finalJournal.emotions.length === 0)) {
         analyzeEmotionForEntry(updatedMessages[0].content, finalJournal, currentMediaFile?.base64, currentMediaFile?.mimeType);
       }
 

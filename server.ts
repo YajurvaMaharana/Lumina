@@ -94,17 +94,35 @@ async function startServer() {
     );
   }
 
+  // Strips all known hardcoded persona prefixes and template wrappers from AI responses
+  function sanitizeTemplatePatterns(text: string): string {
+    if (!text) return text;
+    return text
+      // Strip persona mode tags like [Empathetic Friend Mode], [Analytical Coach Mode], etc.
+      .replace(/^\[.*?(?:Mode|Coach|Friend)\]\s*/i, '')
+      // Strip "Reflecting on what you shared: 'xxx'." pattern
+      .replace(/^Reflecting on what you shared:?\s*(?:['"].*?['"][.,]?\s*)?/i, '')
+      // Strip "Thank you for putting this into words:" pattern
+      .replace(/^Thank you for putting this into words:?\s*(?:['"].*?['"][.,]?\s*)?/i, '')
+      // Strip "Analyzing your initial reflection:" pattern  
+      .replace(/^Analyzing your initial reflection:?\s*(?:['"].*?['"][.,]?\s*)?/i, '')
+      // Strip "You've noted:" pattern
+      .replace(/^You['']ve noted:?\s*(?:['"].*?['"][.,]?\s*)?/i, '')
+      .trim();
+  }
+
   function generateContextualJournalResponse(message: string, history: any[] = [], persona: string = 'empathetic', systemPrompt?: string): string {
     const text = (message || "").trim();
     const p = (persona || 'empathetic').toLowerCase();
     const cleanSnippet = text.length > 90 ? text.slice(0, 90).trim() + "..." : text;
 
-    // Filter user messages in history to determine turn number
-    const userHistory = (history || []).filter((m: any) => m.role === 'user');
-    const turnNumber = userHistory.length; // 0: initial journal entry, 1: 1st follow-up, 2: 2nd follow-up...
+    // Check if any model/assistant response has already been delivered in history
+    const priorModelTurns = (history || []).filter((m: any) => m.role === 'model' || m.sender === 'assistant' || m.sender === 'model');
+    const hasPriorModelTurn = priorModelTurns.length > 0;
+    const turnNumber = hasPriorModelTurn ? priorModelTurns.length : 0;
 
     // Turn 0: Initial Journal Entry Reflection
-    if (turnNumber === 0) {
+    if (!hasPriorModelTurn || turnNumber === 0) {
       if (p.includes('analytical')) {
         return `Analyzing your initial reflection: "${cleanSnippet}". Looking at the variables at play, what is the central assumption driving this situation, and what concrete metric or boundary will determine your next move?`;
       }
@@ -2414,20 +2432,47 @@ ${entriesToProcess.map((e: any) => `[ID: ${e.id}]\nDate: ${e.date}\nTitle: ${e.t
 
   app.post("/api/journal/chat", authenticateUser, async (req, res) => {
     try {
-      const { systemPrompt, persona, message, history, mediaBase64, mediaMimeType } = req.body;
+      const { systemPrompt, persona, message, history, fullHistory, isInitialTurn: explicitIsInitialTurn, mediaBase64, mediaMimeType } = req.body;
       const activePersonaName = persona || 'empathetic';
       
+      const rawHistory = Array.isArray(fullHistory) && fullHistory.length > 0
+        ? fullHistory
+        : (Array.isArray(history) ? history : []);
+
+      // Check whether a prior model turn has occurred in the conversation history
+      const hasPriorModelTurn = rawHistory.some((m: any) => m.role === 'model' || m.sender === 'assistant' || m.sender === 'model');
+      const isInitialTurn = explicitIsInitialTurn !== undefined
+        ? Boolean(explicitIsInitialTurn)
+        : (!hasPriorModelTurn);
+
+      console.log(`[Chat] isInitialTurn=${isInitialTurn}, explicitIsInitialTurn=${explicitIsInitialTurn}, hasPriorModelTurn=${hasPriorModelTurn}, rawHistory.length=${rawHistory.length}, hasSystemPrompt=${!!systemPrompt}`);
+
+      // Adaptive system instruction: only inject opening reflection template on the initial turn.
+      // Subsequent turns MUST proceed as natural ongoing conversational dialogue without greeting templates or persona wrappers.
+      const adaptiveSystemInstruction = isInitialTurn
+        ? (systemPrompt || `You are an insightful journaling mentor adopting the ${activePersonaName} persona. Provide an initial deep reflection on the user's opening entry, followed by a thought-provoking question. Do NOT prefix your response with persona labels like "[Empathetic Friend Mode]". Do NOT start with "Reflecting on what you shared:".`)
+        : `You are in an active ongoing mentoring dialogue with the user as the ${activePersonaName} persona.
+CRITICAL RULES FOR FOLLOW-UP TURNS:
+- The initial greeting and reflection have ALREADY been delivered in prior turns.
+- DO NOT include persona prefixes or tags like "[${activePersonaName} Mode]" or "[Empathetic Friend Mode]".
+- DO NOT say "Reflecting on what you shared:" or repeat opening greeting boilerplate.
+- DO NOT echo or quote the user's message back to them.
+- Directly address the user's latest message in natural conversational flow, explore their ideas deeper, and maintain a seamless multi-turn conversation.
+- Respond as if you are continuing a live conversation, not analyzing a new journal entry.`;
+
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
         console.warn(`[Lumina Server] GEMINI_API_KEY is not configured in .env. Returning contextual AI reflection fallback for persona "${activePersonaName}".`);
-        const fallbackText = generateContextualJournalResponse(message, history, activePersonaName, systemPrompt);
+        let fallbackText = generateContextualJournalResponse(message, rawHistory, activePersonaName, systemPrompt);
+        fallbackText = sanitizeTemplatePatterns(fallbackText);
         return res.json({ text: fallbackText });
       }
 
       const ai = new GoogleGenAI({ apiKey });
 
-      // Fallback model ladder for live Gemini endpoint
+      // Fallback model ladder for live Gemini endpoint with gemini-2.5-flash leading
       const models = [
+        "gemini-2.5-flash",
         "gemini-3.6-flash",
         "gemini-2.0-flash",
         "gemini-3.1-flash-lite",
@@ -2439,11 +2484,55 @@ ${entriesToProcess.map((e: any) => `[ID: ${e.id}]\nDate: ${e.date}\nTitle: ${e.t
       let success = false;
       let lastError = null;
 
-      const isInitialTurn = !history || history.length === 0;
-      const adaptiveSystemInstruction = systemPrompt || (isInitialTurn
-        ? `You are an insightful journaling mentor adopting the ${activePersonaName} persona. Provide an initial deep reflection on the user's opening entry, followed by a thought-provoking question.`
-        : `You are in an active ongoing mentoring dialogue with the user as the ${activePersonaName} persona. The initial greeting and reflection have already been delivered in prior turns. Do not repeat your initial greeting, welcoming prompt, or analyze the opening entry from scratch. Directly address the user's latest reply in the context of our prior exchange, explore their thoughts deeper, and ask a focused follow-up question.`
-      );
+      // Construct normalized contents array for Gemini supporting both { role, parts } and { sender, text }
+      let formattedContents: any[] = rawHistory.map((msg: any) => {
+        const isModel = msg.role === 'model' || msg.sender === 'assistant' || msg.sender === 'model';
+        const role = isModel ? 'model' : 'user';
+        let parts: any[] = [];
+        if (Array.isArray(msg.parts) && msg.parts.length > 0) {
+          parts = msg.parts;
+        } else {
+          const text = msg.text || msg.content || '';
+          parts = [{ text }];
+        }
+        return { role, parts };
+      });
+
+      // If rawHistory didn't already include the latest user message, append it
+      const hasLatestInHistory = formattedContents.length > 0 &&
+        formattedContents[formattedContents.length - 1].role === 'user' &&
+        (formattedContents[formattedContents.length - 1].parts[0]?.text === message || (!message && formattedContents[formattedContents.length - 1].parts.length > 0));
+
+      if (!hasLatestInHistory) {
+        const userParts: any[] = [];
+        if (message && message.trim()) {
+          userParts.push({ text: message });
+        }
+        if (mediaBase64 && mediaMimeType) {
+          userParts.push({ inlineData: { mimeType: mediaMimeType, data: mediaBase64 } });
+        }
+        if (userParts.length === 0) {
+          userParts.push({ text: "Hello" });
+        }
+        formattedContents.push({ role: 'user', parts: userParts });
+      }
+
+      // Merge consecutive items with the same role to prevent Gemini API INVALID_ARGUMENT alternating turns error
+      const validContents: any[] = [];
+      for (const item of formattedContents) {
+        if (validContents.length > 0 && validContents[validContents.length - 1].role === item.role) {
+          validContents[validContents.length - 1].parts.push(...item.parts);
+        } else {
+          validContents.push({ role: item.role, parts: [...item.parts] });
+        }
+      }
+
+      // Separate prior turns and latest message input for SDK chat session management
+      const priorHistory = validContents.length > 1 ? validContents.slice(0, validContents.length - 1) : [];
+      const latestTurn = validContents[validContents.length - 1];
+      const messageParam = (latestTurn && latestTurn.parts && latestTurn.parts.length === 1 && latestTurn.parts[0].text)
+        ? latestTurn.parts[0].text
+        : (latestTurn ? latestTurn.parts : (message || "Hello"));
 
       for (const model of models) {
         let retries = 2;
@@ -2452,30 +2541,19 @@ ${entriesToProcess.map((e: any) => `[ID: ${e.id}]\nDate: ${e.date}\nTitle: ${e.t
 
         for (let i = 0; i < retries; i++) {
           try {
-            const userParts: any[] = [];
-            if (message && message.trim()) {
-                userParts.push({ text: message });
-            }
-            if (mediaBase64 && mediaMimeType) {
-                userParts.push({ inlineData: { mimeType: mediaMimeType, data: mediaBase64 } });
-            }
-            if (userParts.length === 0) {
-                userParts.push({ text: "Hello" });
-            }
-
-            const result = await ai.models.generateContent({
+            // Refactored to use Google Gen AI SDK chat session management: ai.chats.create
+            const chat = ai.chats.create({
               model: model,
-              contents: [
-                ...(history || []).map((msg: any) => ({
-                  role: msg.role === 'model' ? 'model' : 'user',
-                  parts: [{ text: msg.content }]
-                })),
-                { role: 'user', parts: userParts }
-              ],
               config: {
-                 systemInstruction: adaptiveSystemInstruction,
-                 temperature: 0.7,
-              }
+                systemInstruction: adaptiveSystemInstruction,
+                temperature: 0.7,
+              },
+              history: priorHistory
+            });
+
+            // Send message directly to the persistent chat session instance
+            const result = await chat.sendMessage({
+              message: messageParam
             });
 
             responseText = result.text || "";
@@ -2505,8 +2583,12 @@ ${entriesToProcess.map((e: any) => `[ID: ${e.id}]\nDate: ${e.date}\nTitle: ${e.t
 
       if (!success) {
         console.warn(`All Gemini models failed or quota exceeded for chat; generating contextual response fallback for persona "${activePersonaName}".`);
-        responseText = generateContextualJournalResponse(message, history, activePersonaName, systemPrompt);
+        responseText = generateContextualJournalResponse(message, rawHistory, activePersonaName, systemPrompt);
       }
+
+      // Always sanitize template patterns from AI responses (both Gemini-generated and fallback)
+      // This catches cases where the model echoes system prompt boilerplate or persona tags
+      responseText = sanitizeTemplatePatterns(responseText);
 
       res.json({ text: responseText });
 
