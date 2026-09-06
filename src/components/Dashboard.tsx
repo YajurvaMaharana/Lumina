@@ -357,16 +357,15 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
                 <div key={journal.id} className="relative group">
                   <button
                     onClick={() => onSelectJournal(journal.id)}
-                    className="w-full h-full flex flex-col items-start text-left glass p-6 rounded-2xl hover:bg-[var(--bg-card-hover)] transition-all focus:outline-none focus:ring-2 focus:ring-violet-500/40 border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm"
+                    className="w-full h-full flex flex-col items-start text-left glass p-6 rounded-2xl hover:bg-[var(--bg-card-hover)] transition-all focus:outline-none focus:ring-2 focus:ring-violet-500/40 border border-[var(--border-color)] bg-[var(--bg-card)] shadow-sm relative overflow-hidden"
                   >
-                    <div className="flex items-center justify-between w-full mb-3 pr-6">
-                      <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400/80 uppercase tracking-widest">
+                    <div className="flex items-center justify-between w-full mb-3 pr-20">
+                      <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400/80 uppercase tracking-widest truncate">
                         {formatDate(journal.createdAt)}
                       </span>
-                      <ChevronRight className="w-4 h-4 text-[var(--text-faint)] group-hover:text-[var(--text-muted)] transition-colors" />
                     </div>
 
-                    <h3 className="text-base font-semibold text-[var(--text-primary)] mb-2 line-clamp-1 group-hover:text-violet-500 dark:group-hover:text-white transition-colors">
+                    <h3 className="text-base font-semibold text-[var(--text-primary)] mb-2 line-clamp-1 group-hover:text-violet-500 dark:group-hover:text-white transition-colors pr-8">
                       {journal.title || "Untitled Entry"}
                     </h3>
 
@@ -406,26 +405,35 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
                       <span>{journal.messages.length} reflections</span>
                     </div>
                   </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSharingJournal(journal);
-                    }}
-                    className="absolute top-4 right-11 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-violet-500 hover:bg-violet-500/10 opacity-0 group-hover:opacity-100 transition-all focus:opacity-100 z-10"
-                    title="Share Entry (E2EE)"
-                  >
-                    <Share2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeletingJournalId(journal.id);
-                    }}
-                    className="absolute top-4 right-4 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all focus:opacity-100 z-10"
-                    title="Delete Entry"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+
+                  {/* Background Navigation Arrow - visible at rest, smoothly fades out on card/button hover */}
+                  <div className="absolute top-4 right-4 p-1.5 pointer-events-none opacity-60 group-hover:opacity-0 group-hover:invisible group-hover:translate-x-1 transition-all duration-200 z-0">
+                    <ChevronRight className="w-4 h-4 text-[var(--text-faint)]" />
+                  </div>
+
+                  {/* Action Button Dock - smoothly fades in on hover without colliding with date or arrow */}
+                  <div className="absolute top-3.5 right-3.5 flex items-center gap-1 z-10 opacity-0 group-hover:opacity-100 transition-all duration-200 focus-within:opacity-100">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSharingJournal(journal);
+                      }}
+                      className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-violet-500 hover:bg-violet-500/10 transition-colors cursor-pointer"
+                      title="Share Entry (Password Protected)"
+                    >
+                      <Share2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeletingJournalId(journal.id);
+                      }}
+                      className="p-1.5 rounded-lg text-[var(--text-faint)] hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                      title="Delete Entry"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
