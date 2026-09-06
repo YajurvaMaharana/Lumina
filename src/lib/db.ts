@@ -8,7 +8,8 @@ import {
   AutonomousAgentSettings, 
   HabitEvolutionScorecard,
   DevTask,
-  ProjectManagementSettings
+  ProjectManagementSettings,
+  CalendarIntegrationSettings
 } from '../types';
 import { getPassword, encryptData, decryptData } from './crypto';
 
@@ -241,4 +242,22 @@ export const deleteDevTask = async (userId: string, taskId: string): Promise<voi
   await deleteDoc(docRef);
 };
 
+// --- Google Calendar Integration Status ---
+export const getCalendarIntegrationStatus = async (userId: string): Promise<CalendarIntegrationSettings> => {
+  const docRef = doc(db, 'users', userId, 'integrations', 'calendar');
+  const snapshot = await getDoc(docRef);
+  if (snapshot.exists()) {
+    return snapshot.data() as CalendarIntegrationSettings;
+  }
+  return {
+    connected: false,
+    connectedEmail: null,
+    lastSyncedAt: null,
+    autoPromptAfterMeeting: false
+  };
+};
 
+export const saveCalendarIntegrationStatus = async (userId: string, settings: CalendarIntegrationSettings): Promise<void> => {
+  const docRef = doc(db, 'users', userId, 'integrations', 'calendar');
+  await setDoc(docRef, settings, { merge: true });
+};

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Book, LogOut, ChevronRight, Loader2, Sparkles, ShieldAlert, Brain, LayoutGrid, Activity, Palette, Bot, GitPullRequest, Trash2, AlertTriangle, Search } from 'lucide-react';
+import { Plus, Book, LogOut, ChevronRight, Loader2, Sparkles, ShieldAlert, Brain, LayoutGrid, Activity, Palette, Bot, GitPullRequest, Trash2, AlertTriangle, Search, Calendar } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { getJournals } from '../lib/db';
 import { db } from '../lib/firebase';
@@ -12,6 +12,7 @@ import ArtworkVisualizerSection from './ArtworkVisualizerSection';
 import AutonomousAgentSection from './AutonomousAgentSection';
 import ProjectManagementSection from './ProjectManagementSection';
 import AskJournalSection from './AskJournalSection';
+import CalendarIntegrationSection from './CalendarIntegrationSection';
 import ThemeToggle from './ThemeToggle';
 import ProfileDropdown from './ProfileDropdown';
 
@@ -25,7 +26,7 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
   const { user, isAdmin } = useAuth();
   const [journals, setJournals] = useState<Journal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'entries' | 'ask' | 'agent' | 'pm' | 'visualizer' | 'insights' | 'sync'>('entries');
+  const [activeTab, setActiveTab] = useState<'entries' | 'ask' | 'agent' | 'pm' | 'visualizer' | 'insights' | 'sync' | 'calendar'>('entries');
   const [deletingJournalId, setDeletingJournalId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -174,6 +175,18 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
                 <Activity className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
                 <span>Cognitive Sync & Performance</span>
               </button>
+
+              <button
+                onClick={() => setActiveTab('calendar')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === 'calendar'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-950/20'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
+                }`}
+              >
+                <Calendar className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
+                <span>Calendar</span>
+              </button>
             </div>
 
             <button
@@ -199,6 +212,13 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
             <ArtworkVisualizerSection journals={journals} onSelectJournal={(id) => onSelectJournal(id)} />
           ) : activeTab === 'sync' ? (
             <CognitiveSyncSection journalsCount={journals.length} />
+          ) : activeTab === 'calendar' ? (
+            <CalendarIntegrationSection onSelectJournal={(id, meta) => {
+              if (meta) {
+                sessionStorage.setItem('lumina_calendar_event', JSON.stringify(meta));
+              }
+              onSelectJournal(id);
+            }} />
           ) : activeTab === 'insights' ? (
             <PatternInsightsSection journals={journals} />
           ) : journals.length === 0 ? (

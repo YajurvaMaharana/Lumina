@@ -59,6 +59,8 @@ export interface Journal {
     isAccurate: boolean;
     notes?: string;
   };
+  linkedCalendarEventId?: string;
+  linkedCalendarEventSummary?: string;
   
   // Encrypted fields (when saved to Firestore)
   encryptedPayload?: {
@@ -106,6 +108,7 @@ export interface IntegrationSettings {
     webhookUrl?: string;
     lastDeliveredAt?: number;
   };
+  calendar?: CalendarIntegrationSettings;
   privacyAcknowledged: boolean;
   updatedAt?: number;
 }
@@ -272,4 +275,22 @@ export interface ProjectManagementSettings {
   requireConfirmation: boolean;
 }
 
+export interface CalendarEvent {
+  id: string;
+  summary: string;
+  description?: string;
+  start: string; // ISO date-time
+  end: string;   // ISO date-time
+  location?: string;
+  attendeeCount: number;
+  htmlLink?: string;
+  isAllDay: boolean;
+  status: 'confirmed' | 'tentative' | 'cancelled';
+}
 
+export interface CalendarIntegrationSettings {
+  connected: boolean;
+  connectedEmail: string | null;
+  lastSyncedAt: number | null;
+  autoPromptAfterMeeting: boolean;
+}

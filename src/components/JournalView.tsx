@@ -228,16 +228,39 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
 
   useEffect(() => {
     if (journalId === 'new') {
+      // Check for linked calendar event from sessionStorage
+      let linkedEventId: string | undefined;
+      let linkedEventSummary: string | undefined;
+      let calendarPrompt = '';
+      try {
+        const calMeta = sessionStorage.getItem('lumina_calendar_event');
+        if (calMeta) {
+          const parsed = JSON.parse(calMeta);
+          linkedEventId = parsed.eventId;
+          linkedEventSummary = parsed.eventSummary;
+          const eventTime = parsed.eventTime ? new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(parsed.eventTime)) : '';
+          calendarPrompt = `You just finished \"${linkedEventSummary}\"${eventTime ? ` (${eventTime})` : ''}. How did it go? What stood out to you?`;
+          sessionStorage.removeItem('lumina_calendar_event');
+        }
+      } catch (_) {}
+
       const newJournal: Journal = {
         id: crypto.randomUUID(),
         userId: user!.uid,
-        title: 'New Reflection',
+        title: linkedEventSummary ? `📅 ${linkedEventSummary}` : 'New Reflection',
         summary: '',
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        messages: []
+        messages: [],
+        ...(linkedEventId && { linkedCalendarEventId: linkedEventId }),
+        ...(linkedEventSummary && { linkedCalendarEventSummary: linkedEventSummary })
       };
       setJournal(newJournal);
+
+      // Pre-fill input with calendar context prompt
+      if (calendarPrompt) {
+        setInput(calendarPrompt);
+      }
     } else {
       loadJournal();
     }
@@ -727,6 +750,15 @@ ${journal.location ? `- The user is currently writing from: ${journal.location}.
             <div className="text-xs uppercase tracking-[0.2em] text-[var(--text-faint)] font-bold hidden sm:block">Active Session</div>
             <div className="h-4 w-[1px] bg-[var(--border-color)] hidden sm:block"></div>
             <div className="text-sm font-medium text-violet-600 dark:text-violet-400 line-clamp-1 max-w-[200px] sm:max-w-xs">{journal.title}</div>
+            {journal.linkedCalendarEventSummary && (
+              <>
+                <div className="h-4 w-[1px] bg-[var(--border-color)] hidden sm:block"></div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[10px] font-semibold hidden sm:flex">
+                  <span>📅</span>
+                  <span className="truncate max-w-[120px]">{journal.linkedCalendarEventSummary}</span>
+                </div>
+              </>
+            )}
             {journal.location && (
               <>
                 <div className="h-4 w-[1px] bg-[var(--border-color)] hidden sm:block"></div>

@@ -1,7 +1,16 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+// Prevent background gRPC ADC lookup warnings and unhandled promise rejections from crashing the server
+process.on("unhandledRejection", (reason: any) => {
+  console.warn("[Process] Handled background promise rejection:", reason?.message || reason);
+});
+process.on("uncaughtException", (err: any) => {
+  console.error("[Process] Handled background uncaught exception:", err?.message || err);
+});
+
 import express from "express";
+import crypto from "crypto";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { initializeApp } from "firebase-admin/app";
@@ -2583,6 +2592,494 @@ ${entriesToProcess.map((e: any) => `[ID: ${e.id}]\nDate: ${e.date}\nTitle: ${e.t
     } catch (error) {
       console.error("Chat error:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // ============================================================================================
+  // GOOGLE CALENDAR INTEGRATION — OAuth 2.0 with PKCE + Calendar Events API
+  // ============================================================================================
+
+  // Helper: Generate cryptographic random string for PKCE
+  function generateCodeVerifier(): string {
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  // Helper: SHA-256 hash for PKCE code_challenge
+  async function generateCodeChallenge(verifier: string): Promise<string> {
+    return crypto.createHash('sha256').update(verifier).digest('base64url');
+  }
+
+  // In-memory fallback stores for local development when Google Cloud ADC is not configured
+  interface StoredCalendarTokens {
+    access_token: string;
+    refresh_token?: string;
+    expires_at: number;
+    connected_email?: string;
+    connected_at: number;
+  }
+  interface StoredCalendarOAuthState {
+    code_verifier: string;
+    created_at: number;
+  }
+  interface StoredCalendarStatus {
+    connected: boolean;
+    connectedEmail: string | null;
+    lastSyncedAt: number | null;
+    autoPromptAfterMeeting: boolean;
+  }
+
+  // In local development without Google Cloud ADC credentials, use local storage directly
+  const isCloudEnvironment = !!(process.env.K_SERVICE || process.env.GOOGLE_APPLICATION_CREDENTIALS);
+  let firestoreAvailable = isCloudEnvironment;
+  const localCalendarTokens = new Map<string, StoredCalendarTokens>();
+  const localCalendarOAuthState = new Map<string, StoredCalendarOAuthState>();
+  const localCalendarStatus = new Map<string, StoredCalendarStatus>();
+
+  async function getStoredCalendarTokens(uid: string): Promise<StoredCalendarTokens | null> {
+    if (firestoreAvailable) {
+      try {
+        const doc = await db.collection('users').doc(uid).collection('integrations').doc('calendar_tokens').get();
+        if (doc.exists) return doc.data() as StoredCalendarTokens;
+      } catch (err: any) {
+        if (err?.message?.includes('credentials') || err?.message?.includes('NO_ADC_FOUND')) {
+          firestoreAvailable = false;
+        }
+      }
+    }
+    return localCalendarTokens.get(uid) || null;
+  }
+
+  async function saveStoredCalendarTokens(uid: string, tokens: StoredCalendarTokens, merge = false): Promise<void> {
+    const existing = localCalendarTokens.get(uid) || ({} as StoredCalendarTokens);
+    localCalendarTokens.set(uid, merge ? { ...existing, ...tokens } : tokens);
+    if (firestoreAvailable) {
+      try {
+        await db.collection('users').doc(uid).collection('integrations').doc('calendar_tokens').set(tokens, { merge });
+      } catch (err: any) {
+        if (err?.message?.includes('credentials') || err?.message?.includes('NO_ADC_FOUND')) {
+          firestoreAvailable = false;
+        }
+      }
+    }
+  }
+
+  async function deleteStoredCalendarTokens(uid: string): Promise<void> {
+    localCalendarTokens.delete(uid);
+    if (firestoreAvailable) {
+      try {
+        await db.collection('users').doc(uid).collection('integrations').doc('calendar_tokens').delete();
+      } catch (_) {}
+    }
+  }
+
+  async function getStoredOAuthState(uid: string): Promise<StoredCalendarOAuthState | null> {
+    if (firestoreAvailable) {
+      try {
+        const doc = await db.collection('users').doc(uid).collection('integrations').doc('calendar_oauth_state').get();
+        if (doc.exists) return doc.data() as StoredCalendarOAuthState;
+      } catch (err: any) {
+        if (err?.message?.includes('credentials') || err?.message?.includes('NO_ADC_FOUND')) {
+          firestoreAvailable = false;
+        }
+      }
+    }
+    return localCalendarOAuthState.get(uid) || null;
+  }
+
+  async function saveStoredOAuthState(uid: string, state: StoredCalendarOAuthState): Promise<void> {
+    localCalendarOAuthState.set(uid, state);
+    if (firestoreAvailable) {
+      try {
+        await db.collection('users').doc(uid).collection('integrations').doc('calendar_oauth_state').set(state);
+      } catch (err: any) {
+        if (err?.message?.includes('credentials') || err?.message?.includes('NO_ADC_FOUND')) {
+          firestoreAvailable = false;
+        }
+      }
+    }
+  }
+
+  async function deleteStoredOAuthState(uid: string): Promise<void> {
+    localCalendarOAuthState.delete(uid);
+    if (firestoreAvailable) {
+      try {
+        await db.collection('users').doc(uid).collection('integrations').doc('calendar_oauth_state').delete();
+      } catch (_) {}
+    }
+  }
+
+  async function getStoredCalendarStatus(uid: string): Promise<StoredCalendarStatus> {
+    if (firestoreAvailable) {
+      try {
+        const doc = await db.collection('users').doc(uid).collection('integrations').doc('calendar').get();
+        if (doc.exists) {
+          const d = doc.data();
+          return {
+            connected: d?.connected || false,
+            connectedEmail: d?.connectedEmail || null,
+            lastSyncedAt: d?.lastSyncedAt || null,
+            autoPromptAfterMeeting: d?.autoPromptAfterMeeting || false,
+          };
+        }
+      } catch (err: any) {
+        if (err?.message?.includes('credentials') || err?.message?.includes('NO_ADC_FOUND')) {
+          firestoreAvailable = false;
+        }
+      }
+    }
+    return localCalendarStatus.get(uid) || {
+      connected: false,
+      connectedEmail: null,
+      lastSyncedAt: null,
+      autoPromptAfterMeeting: false,
+    };
+  }
+
+  async function saveStoredCalendarStatus(uid: string, status: Partial<StoredCalendarStatus>): Promise<void> {
+    const current = await getStoredCalendarStatus(uid);
+    const updated: StoredCalendarStatus = { ...current, ...status };
+    localCalendarStatus.set(uid, updated);
+    if (firestoreAvailable) {
+      try {
+        await db.collection('users').doc(uid).collection('integrations').doc('calendar').set(updated, { merge: true });
+      } catch (err: any) {
+        if (err?.message?.includes('credentials') || err?.message?.includes('NO_ADC_FOUND')) {
+          firestoreAvailable = false;
+        }
+      }
+    }
+  }
+
+  // Helper: Refresh an expired access token using the stored refresh_token
+  async function refreshCalendarAccessToken(uid: string): Promise<string | null> {
+    const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET;
+    if (!clientId || !clientSecret) return null;
+
+    const tokenData = await getStoredCalendarTokens(uid);
+    const refreshToken = tokenData?.refresh_token;
+    if (!refreshToken) return null;
+
+    try {
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          refresh_token: refreshToken,
+          grant_type: 'refresh_token'
+        })
+      });
+
+      if (!tokenRes.ok) {
+        console.error('[Calendar] Token refresh failed:', await tokenRes.text());
+        return null;
+      }
+
+      const newTokens = await tokenRes.json();
+
+      // Update stored access token
+      await saveStoredCalendarTokens(uid, {
+        access_token: newTokens.access_token,
+        expires_at: Date.now() + (newTokens.expires_in || 3600) * 1000,
+        connected_at: tokenData?.connected_at || Date.now(),
+        connected_email: tokenData?.connected_email
+      }, true);
+
+      return newTokens.access_token;
+    } catch (err) {
+      console.error('[Calendar] Error refreshing token:', err);
+      return null;
+    }
+  }
+
+  // 1. Start OAuth flow — generate consent URL with PKCE
+  app.get("/api/calendar/oauth/start", authenticateUser, async (req, res) => {
+    try {
+      const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID;
+      if (!clientId) {
+        return res.status(500).json({ error: "Google Calendar integration is not configured. GOOGLE_CALENDAR_CLIENT_ID is missing." });
+      }
+
+      const uid = (req as any).user.uid;
+      const codeVerifier = generateCodeVerifier();
+      const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+      // Store the code_verifier temporarily in server store (keyed by uid)
+      await saveStoredOAuthState(uid, {
+        code_verifier: codeVerifier,
+        created_at: Date.now()
+      });
+
+      const appUrl = process.env.APP_URL || 'http://localhost:3000';
+      const redirectUri = `${appUrl}/api/calendar/oauth/callback`;
+
+      const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email',
+        access_type: 'offline',
+        prompt: 'consent',
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+        state: uid // We verify this on callback
+      });
+
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+      res.json({ url: authUrl });
+    } catch (error: any) {
+      console.error('[Calendar] OAuth start error:', error);
+      res.status(500).json({ error: 'Failed to initiate calendar OAuth flow' });
+    }
+  });
+
+  // 2. OAuth callback — exchange authorization code for tokens
+  app.get("/api/calendar/oauth/callback", async (req, res) => {
+    try {
+      const { code, state: uid, error: oauthError } = req.query;
+
+      if (oauthError) {
+        console.error('[Calendar] OAuth error:', oauthError);
+        return res.redirect('/?calendar_error=consent_denied');
+      }
+
+      if (!code || !uid || typeof uid !== 'string') {
+        return res.redirect('/?calendar_error=invalid_callback');
+      }
+
+      const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID;
+      const clientSecret = process.env.GOOGLE_CALENDAR_CLIENT_SECRET;
+      if (!clientId || !clientSecret) {
+        return res.redirect('/?calendar_error=not_configured');
+      }
+
+      // Retrieve stored code_verifier
+      const stateData = await getStoredOAuthState(uid);
+      if (!stateData?.code_verifier) {
+        return res.redirect('/?calendar_error=expired_state');
+      }
+      const codeVerifier = stateData.code_verifier;
+
+      const appUrl = process.env.APP_URL || 'http://localhost:3000';
+      const redirectUri = `${appUrl}/api/calendar/oauth/callback`;
+
+      // Exchange code for tokens
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: clientId,
+          client_secret: clientSecret,
+          code: code as string,
+          code_verifier: codeVerifier,
+          grant_type: 'authorization_code',
+          redirect_uri: redirectUri
+        })
+      });
+
+      if (!tokenRes.ok) {
+        const errText = await tokenRes.text();
+        console.error('[Calendar] Token exchange failed:', errText);
+        return res.redirect('/?calendar_error=token_exchange_failed');
+      }
+
+      const tokens = await tokenRes.json();
+
+      // Get user email from Google userinfo
+      let connectedEmail = '';
+      try {
+        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+          headers: { 'Authorization': `Bearer ${tokens.access_token}` }
+        });
+        if (userInfoRes.ok) {
+          const userInfo = await userInfoRes.json();
+          connectedEmail = userInfo.email || '';
+        }
+      } catch (e) {
+        console.warn('[Calendar] Could not fetch user email:', e);
+      }
+
+      // Store tokens securely server-side (never exposed to client)
+      await saveStoredCalendarTokens(uid, {
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expires_at: Date.now() + (tokens.expires_in || 3600) * 1000,
+        connected_email: connectedEmail,
+        connected_at: Date.now()
+      });
+
+      // Update client-visible calendar status
+      await saveStoredCalendarStatus(uid, {
+        connected: true,
+        connectedEmail: connectedEmail,
+        lastSyncedAt: null,
+        autoPromptAfterMeeting: false
+      });
+
+      // Clean up OAuth state
+      await deleteStoredOAuthState(uid);
+
+      res.redirect('/?calendar_connected=true');
+    } catch (error: any) {
+      console.error('[Calendar] OAuth callback error:', error);
+      res.redirect('/?calendar_error=callback_failed');
+    }
+  });
+
+  // 3. Fetch calendar events
+  app.get("/api/calendar/events", authenticateUser, async (req, res) => {
+    try {
+      const uid = (req as any).user.uid;
+
+      // Read stored tokens
+      const tokenData = await getStoredCalendarTokens(uid);
+      if (!tokenData?.access_token) {
+        return res.status(401).json({ error: "Calendar not connected. Please connect your Google Calendar first." });
+      }
+
+      let accessToken = tokenData.access_token;
+      const expiresAt = tokenData.expires_at || 0;
+
+      // Auto-refresh if expired
+      if (Date.now() >= expiresAt - 60000) { // Refresh 1 minute before expiry
+        const newToken = await refreshCalendarAccessToken(uid);
+        if (!newToken) {
+          // Refresh failed, mark as disconnected
+          await saveStoredCalendarStatus(uid, {
+            connected: false,
+            connectedEmail: null,
+            lastSyncedAt: null,
+            autoPromptAfterMeeting: false
+          });
+          return res.status(401).json({ error: "Calendar session expired. Please reconnect your Google Calendar." });
+        }
+        accessToken = newToken;
+      }
+
+      // Fetch events from Google Calendar API (past 7 days + next 7 days)
+      const now = new Date();
+      const timeMin = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const timeMax = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      const calParams = new URLSearchParams({
+        timeMin,
+        timeMax,
+        maxResults: '30',
+        singleEvents: 'true',
+        orderBy: 'startTime'
+      });
+
+      const calRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${calParams.toString()}`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+
+      if (calRes.status === 401) {
+        // Token expired during request, try refresh once
+        const newToken = await refreshCalendarAccessToken(uid);
+        if (newToken) {
+          const retryRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${calParams.toString()}`, {
+            headers: { 'Authorization': `Bearer ${newToken}` }
+          });
+          if (!retryRes.ok) {
+            return res.status(500).json({ error: "Failed to fetch calendar events after token refresh." });
+          }
+          const retryData = await retryRes.json();
+          const events = (retryData.items || []).map((e: any) => sanitizeCalendarEvent(e));
+
+          await saveStoredCalendarStatus(uid, { lastSyncedAt: Date.now() });
+
+          return res.json({ events });
+        }
+        return res.status(401).json({ error: "Calendar session expired. Please reconnect." });
+      }
+
+      if (!calRes.ok) {
+        const errText = await calRes.text();
+        console.error('[Calendar] Events fetch error:', errText);
+        return res.status(500).json({ error: "Failed to fetch calendar events." });
+      }
+
+      const calData = await calRes.json();
+      const events = (calData.items || []).map((e: any) => sanitizeCalendarEvent(e));
+
+      // Update last synced timestamp
+      await saveStoredCalendarStatus(uid, { lastSyncedAt: Date.now() });
+
+      res.json({ events });
+    } catch (error: any) {
+      console.error('[Calendar] Events error:', error);
+      res.status(500).json({ error: "Failed to fetch calendar events." });
+    }
+  });
+
+  // Helper: Strip sensitive data from Calendar event before sending to client
+  function sanitizeCalendarEvent(event: any) {
+    return {
+      id: event.id || '',
+      summary: event.summary || '(No title)',
+      description: (event.description || '').substring(0, 200),
+      start: event.start?.dateTime || event.start?.date || '',
+      end: event.end?.dateTime || event.end?.date || '',
+      location: event.location || '',
+      attendeeCount: (event.attendees || []).length,
+      htmlLink: event.htmlLink || '',
+      isAllDay: !!event.start?.date && !event.start?.dateTime,
+      status: event.status || 'confirmed'
+    };
+  }
+
+  // 4. Disconnect calendar — revoke token and clear Firestore/local store
+  app.post("/api/calendar/disconnect", authenticateUser, async (req, res) => {
+    try {
+      const uid = (req as any).user.uid;
+
+      // Read stored tokens to revoke
+      const tokenData = await getStoredCalendarTokens(uid);
+      if (tokenData?.access_token) {
+        const accessToken = tokenData.access_token;
+        // Best-effort revocation via Google endpoint
+        try {
+          await fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+          });
+        } catch (revokeErr) {
+          console.warn('[Calendar] Token revocation failed (non-critical):', revokeErr);
+        }
+
+        // Delete stored tokens
+        await deleteStoredCalendarTokens(uid);
+      }
+
+      // Delete OAuth state if any lingering
+      await deleteStoredOAuthState(uid);
+
+      // Reset client-visible status
+      await saveStoredCalendarStatus(uid, {
+        connected: false,
+        connectedEmail: null,
+        lastSyncedAt: null,
+        autoPromptAfterMeeting: false
+      });
+
+      res.json({ success: true, message: "Google Calendar disconnected and tokens revoked." });
+    } catch (error: any) {
+      console.error('[Calendar] Disconnect error:', error);
+      res.status(500).json({ error: "Failed to disconnect calendar." });
+    }
+  });
+
+  // 5. Calendar connection status
+  app.get("/api/calendar/status", authenticateUser, async (req, res) => {
+    try {
+      const uid = (req as any).user.uid;
+      const status = await getStoredCalendarStatus(uid);
+      res.json(status);
+    } catch (error: any) {
+      console.error('[Calendar] Status error:', error);
+      res.status(500).json({ error: "Failed to fetch calendar status." });
     }
   });
 
