@@ -85,10 +85,10 @@ export default function DailyStreakBadge({ journals, userId, onOpenNewEntry }: D
         </span>
       </button>
 
-      {/* Click-Away Backdrop Blur Overlay */}
+      {/* Click-away backdrop overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/20 dark:bg-black/45 backdrop-blur-[2px] transition-opacity duration-200 cursor-default"
+          className="fixed inset-0 z-40 bg-black/35 dark:bg-black/65 backdrop-blur-[2px] transition-opacity duration-200 cursor-default"
           onClick={() => setIsOpen(false)}
           aria-hidden="true"
         />
@@ -101,10 +101,10 @@ export default function DailyStreakBadge({ journals, userId, onOpenNewEntry }: D
           role="dialog"
           aria-modal="true"
           aria-label="Daily Cognitive Streak Details"
-          className="absolute right-0 top-full mt-5 w-[calc(100vw-2rem)] sm:w-88 max-w-sm rounded-2xl glass border border-[var(--border-color)] shadow-2xl p-4 sm:p-5 z-50 animate-scale-up bg-white/95 dark:bg-[#0c1017]/95 backdrop-blur-2xl ring-1 ring-black/5 dark:ring-white/10"
+          className="absolute right-0 top-full mt-5 w-[calc(100vw-2rem)] sm:w-88 max-w-sm rounded-2xl border border-slate-300 dark:border-slate-800/90 shadow-2xl p-4 sm:p-5 z-50 animate-scale-up bg-white dark:bg-slate-950 backdrop-blur-3xl ring-1 ring-black/10 dark:ring-white/10"
         >
           {/* Header */}
-          <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800/80">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20">
                 <Flame className="w-4.5 h-4.5 fill-white/30" />
@@ -124,7 +124,7 @@ export default function DailyStreakBadge({ journals, userId, onOpenNewEntry }: D
           </div>
 
           {/* Main Streak Counter Card */}
-          <div className="my-4 p-4 rounded-xl bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent border border-amber-500/20 text-center relative overflow-hidden">
+          <div className="my-4 p-4 rounded-xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-500/25 text-center relative overflow-hidden shadow-inner">
             <div className="flex items-center justify-center gap-2 mb-1">
               <Flame className="w-6 h-6 text-amber-500 fill-amber-500/40 animate-flame" />
               <span className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white font-mono">
@@ -167,7 +167,7 @@ export default function DailyStreakBadge({ journals, userId, onOpenNewEntry }: D
                         ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                         : day.isActive
                         ? 'border-violet-500/30 bg-violet-500/10 text-violet-600 dark:text-violet-400'
-                        : 'border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-muted)] opacity-60'
+                        : 'border-slate-200 dark:border-slate-800/80 bg-slate-100/90 dark:bg-slate-900/95 text-[var(--text-muted)] opacity-75'
                     }`}
                     title={`${day.dateStr}: ${day.hasJournal ? 'Journaled' : day.isActive ? 'Active Login' : 'No activity'}`}
                   >
@@ -191,8 +191,8 @@ export default function DailyStreakBadge({ journals, userId, onOpenNewEntry }: D
           </div>
 
           {/* Stats Bar */}
-          <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[var(--border-subtle)] text-xs">
-            <div className="flex items-center gap-2 p-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)]">
+          <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-200 dark:border-slate-800/80 text-xs">
+            <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800/80 shadow-sm">
               <Trophy className="w-4 h-4 text-amber-500 shrink-0" />
               <div>
                 <p className="text-[10px] text-[var(--text-muted)] uppercase">Best Streak</p>
@@ -200,7 +200,7 @@ export default function DailyStreakBadge({ journals, userId, onOpenNewEntry }: D
               </div>
             </div>
 
-            <div className="flex items-center gap-2 p-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-subtle)]">
+            <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-800/80 shadow-sm">
               <Sparkles className="w-4 h-4 text-violet-500 shrink-0" />
               <div>
                 <p className="text-[10px] text-[var(--text-muted)] uppercase">Total Active</p>
