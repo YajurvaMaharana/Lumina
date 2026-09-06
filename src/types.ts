@@ -61,6 +61,7 @@ export interface Journal {
   };
   linkedCalendarEventId?: string;
   linkedCalendarEventSummary?: string;
+  sharedConnections?: string[]; // Connection IDs this entry is currently shared with
   
   // Encrypted fields (when saved to Firestore)
   encryptedPayload?: {
@@ -294,3 +295,94 @@ export interface CalendarIntegrationSettings {
   lastSyncedAt: number | null;
   autoPromptAfterMeeting: boolean;
 }
+
+// ============================================================================
+// COLLABORATIVE JOURNALING (E2EE & AI JOINT REFLECTIONS)
+// ============================================================================
+
+export type CollaborationRole = 'couples' | 'accountability' | 'friend';
+
+export interface CollaborativeConnection {
+  id: string; // Connection ID
+  inviterUid: string;
+  inviterName: string;
+  partnerUid: string;
+  partnerName: string;
+  role: CollaborationRole;
+  status: 'pending' | 'accepted' | 'disconnected';
+  createdAt: number;
+  acceptedAt?: number;
+  autoShareTags: string[]; // e.g. ['#relationship', '#accountability']
+  inviteCode: string;
+}
+
+export interface CollaborativeInvite {
+  id: string;
+  inviteCode: string;
+  inviterUid: string;
+  inviterName: string;
+  role: CollaborationRole;
+  autoShareTags: string[];
+  expiresAt: number;
+  createdAt: number;
+  accepted: boolean;
+  acceptedByUid?: string;
+  acceptedByName?: string;
+}
+
+export interface SharedJournalEntry {
+  id: string; // Shared entry ID
+  originalJournalId: string;
+  connectionId: string;
+  authorUid: string;
+  authorName: string;
+  partnerUid: string;
+  role: CollaborationRole;
+  createdAt: number;
+  updatedAt: number;
+  tags: string[];
+  // End-to-end encrypted payload containing title, messages, summary, emotions, artwork
+  encryptedPayload: {
+    ciphertext: string;
+    salt: string;
+    iv: string;
+  };
+  accessHash?: string; // SHA-256 access verification hash for password validation
+  isPasswordProtected?: boolean;
+  // Optional sanitized plain summary preview for dashboard card
+  topicPreview?: string;
+}
+
+export interface DecryptedSharedEntry extends Omit<SharedJournalEntry, 'encryptedPayload'> {
+  title: string;
+  summary: string;
+  messages: Message[];
+  emotions?: EmotionTag[];
+  artwork?: JournalArtwork;
+  isUnlocked?: boolean;
+  encryptedPayload?: {
+    ciphertext: string;
+    salt: string;
+    iv: string;
+  };
+}
+
+export interface JointReflectionPrompt {
+  id: string;
+  connectionId: string;
+  prompt: string;
+  theme: string;
+  role: CollaborationRole;
+  createdAt: number;
+  partnerA_response?: {
+    text: string;
+    authorName: string;
+    updatedAt: number;
+  };
+  partnerB_response?: {
+    text: string;
+    authorName: string;
+    updatedAt: number;
+  };
+}
+

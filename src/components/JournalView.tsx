@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Sparkles, Loader2, Save, Mic, MicOff, ShieldAlert, Palette, Paperclip, X, MapPin, ChevronDown, UserCog } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, Loader2, Save, Mic, MicOff, ShieldAlert, Palette, Paperclip, X, MapPin, ChevronDown, UserCog, Share2 } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
-import { getJournal, saveJournal } from '../lib/db';
+import { getJournal, saveJournal, extractTagsFromText, fetchCollaborativeConnections, publishSharedEntry } from '../lib/db';
+import { encryptWithShareKey, getPartnerKey } from '../lib/crypto';
 import { Journal, Message, EmotionTag, CBTDistortion } from '../types';
 import EmotionTagManager from './EmotionTagManager';
 import QuoteCardStudio from './QuoteCardStudio';
+import ShareEntryModal from './ShareEntryModal';
 import ThemeToggle from './ThemeToggle';
 
 export type AIPersona = 'neutral' | 'analytical' | 'empathetic';
@@ -66,6 +68,7 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
     return 'analytical';
   });
   const [showPersonaDropdown, setShowPersonaDropdown] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -699,6 +702,50 @@ ${journal.location ? `- The user is currently writing from: ${journal.location}.
         analyzeEmotionForEntry(updatedMessages[0].content, finalJournal, currentMediaFile?.base64, currentMediaFile?.mimeType);
       }
 
+      // Check rule-based auto-sharing for connected partners
+      (async () => {
+        try {
+          if (!user) return;
+          const idToken = await user.getIdToken();
+          const conns = await fetchCollaborativeConnections(idToken);
+          if (!conns || conns.length === 0) return;
+
+          const allText = `${finalJournal.title} ${finalJournal.summary} ${(finalJournal.messages || []).map(m => m.content).join(' ')}`;
+          const tags = extractTagsFromText(allText);
+          if (tags.length === 0) return;
+
+          for (const conn of conns) {
+            if (!conn.autoShareTags || conn.autoShareTags.length === 0) continue;
+            const hasMatchingTag = conn.autoShareTags.some((t: string) => tags.includes(t.toLowerCase()));
+            if (hasMatchingTag) {
+              const partnerKey = getPartnerKey(conn.id);
+              if (partnerKey) {
+                const payload = {
+                  title: finalJournal.title,
+                  summary: finalJournal.summary,
+                  messages: finalJournal.messages,
+                  emotions: finalJournal.emotions,
+                  artwork: finalJournal.artwork,
+                  createdAt: finalJournal.createdAt,
+                  location: finalJournal.location
+                };
+                const encrypted = await encryptWithShareKey(payload, partnerKey);
+                await publishSharedEntry(idToken, {
+                  originalJournalId: finalJournal.id,
+                  connectionId: conn.id,
+                  encryptedPayload: encrypted,
+                  tags,
+                  topicPreview: finalJournal.title
+                });
+                console.log(`[Collaborative] Auto-shared entry with ${conn.partnerName || conn.inviterName} via matching tags.`);
+              }
+            }
+          }
+        } catch (autoErr) {
+          console.warn('[Collaborative] Auto-share notice:', autoErr);
+        }
+      })();
+
     } catch (err) {
       console.error(err);
       setError("Failed to get response from AI.");
@@ -819,6 +866,21 @@ ${journal.location ? `- The user is currently writing from: ${journal.location}.
           <ThemeToggle />
 
           <button
+            onClick={() => setShowShareModal(true)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors ${
+              journal.sharedConnections && journal.sharedConnections.length > 0
+                ? 'bg-purple-500/15 border-purple-500/30 text-purple-600 dark:text-purple-400'
+                : 'bg-[var(--bg-card)] hover:bg-[var(--bg-card-hover)] border-[var(--border-color)] text-[var(--text-secondary)]'
+            }`}
+            title="Share Entry (End-to-End Encrypted)"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">
+              {journal.sharedConnections && journal.sharedConnections.length > 0 ? 'Shared (E2EE)' : 'Share'}
+            </span>
+          </button>
+
+          <button
             onClick={() => setShowQuoteStudio(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 text-xs font-semibold text-violet-700 dark:text-violet-300 transition-colors"
             title="Artwork & Quote Card Studio"
@@ -844,6 +906,18 @@ ${journal.location ? `- The user is currently writing from: ${journal.location}.
             />
           </div>
         </div>
+      )}
+
+      {/* Share Entry Modal */}
+      {showShareModal && journal && (
+        <ShareEntryModal
+          journal={journal}
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          onShareUpdated={(updatedConns) => {
+            setJournal(prev => prev ? { ...prev, sharedConnections: updatedConns } : null);
+          }}
+        />
       )}
 
       {/* Chat Area */}

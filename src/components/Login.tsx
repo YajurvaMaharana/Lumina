@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { loginWithGoogle, firebaseConfig } from '../lib/firebase';
 import { BookOpen, AlertTriangle, Loader2, RefreshCw, HelpCircle } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
+import NeuralOrbit from './NeuralOrbit';
 import { useAuth } from '../lib/AuthContext';
 
 export default function Login() {
@@ -92,9 +93,7 @@ export default function Login() {
       
       <div className="w-full max-w-md glass bg-[var(--bg-card)] border border-[var(--border-color)] rounded-2xl p-8 text-center relative z-10 shadow-xl">
         <div className="flex justify-center mb-6">
-          <div className="h-16 w-16 bg-gradient-to-tr from-violet-600 to-indigo-400 rounded-2xl flex items-center justify-center shadow-lg shadow-violet-500/20">
-            <BookOpen size={32} className="text-white" />
-          </div>
+          <NeuralOrbit size={64} />
         </div>
         <h1 className="text-3xl font-semibold tracking-tight glow-text mb-2 text-[var(--text-primary)]">Lumina</h1>
         <p className="text-[var(--text-muted)] mb-6 text-sm">

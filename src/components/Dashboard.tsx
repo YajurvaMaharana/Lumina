@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Plus, Book, LogOut, ChevronRight, Loader2, Sparkles, ShieldAlert, Brain, LayoutGrid, Activity, Palette, Bot, GitPullRequest, Trash2, AlertTriangle, Search, Calendar } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Plus, Book, LogOut, ChevronRight, Loader2, Sparkles, ShieldAlert, Brain, LayoutGrid, Activity, Palette, Bot, GitPullRequest, Trash2, AlertTriangle, Search, Calendar, Users, Share2, Lock, X, KeyRound, Bell, Download } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
-import { getJournals } from '../lib/db';
+import { getJournals, fetchSharedEntries } from '../lib/db';
 import { db } from '../lib/firebase';
 import { deleteDoc, doc } from 'firebase/firestore';
 import { Journal } from '../types';
@@ -13,8 +13,12 @@ import AutonomousAgentSection from './AutonomousAgentSection';
 import ProjectManagementSection from './ProjectManagementSection';
 import AskJournalSection from './AskJournalSection';
 import CalendarIntegrationSection from './CalendarIntegrationSection';
+import CollaborativeSection from './CollaborativeSection';
+import ShareEntryModal from './ShareEntryModal';
+import ExportAuditTrailModal from './ExportAuditTrailModal';
 import ThemeToggle from './ThemeToggle';
 import ProfileDropdown from './ProfileDropdown';
+import NeuralOrbit from './NeuralOrbit';
 
 interface DashboardProps {
   onSelectJournal: (journalId: string | 'new') => void;
@@ -22,17 +26,99 @@ interface DashboardProps {
   onLockVault?: () => void;
 }
 
+interface SharedEntryNotification {
+  entryId: string;
+  connectionId: string;
+  authorName: string;
+  topicPreview: string;
+  createdAt: number;
+}
+
 export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }: DashboardProps) {
   const { user, isAdmin } = useAuth();
   const [journals, setJournals] = useState<Journal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'entries' | 'ask' | 'agent' | 'pm' | 'visualizer' | 'insights' | 'sync' | 'calendar'>('entries');
+  const [activeTab, setActiveTab] = useState<'entries' | 'ask' | 'agent' | 'pm' | 'visualizer' | 'insights' | 'sync' | 'calendar' | 'collaborative'>('entries');
   const [deletingJournalId, setDeletingJournalId] = useState<string | null>(null);
+  const [sharingJournal, setSharingJournal] = useState<Journal | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+
+  // Real-time collaborative shared entry notification state
+  const [sharedEntryToast, setSharedEntryToast] = useState<SharedEntryNotification | null>(null);
+  const [collabTargetEntryId, setCollabTargetEntryId] = useState<string | null>(null);
+  const knownEntryIdsRef = useRef<Set<string>>(new Set());
+  const isInitialPollRef = useRef<boolean>(true);
 
   useEffect(() => {
     if (user) {
       loadJournals();
     }
+  }, [user]);
+
+  // Real-time listener & polling for incoming shared reflections from partners
+  useEffect(() => {
+    if (!user) return;
+
+    let isMounted = true;
+
+    const checkForNewSharedEntries = async () => {
+      try {
+        const idToken = await user.getIdToken();
+        const entries = await fetchSharedEntries(idToken);
+        if (!isMounted || !entries) return;
+
+        if (isInitialPollRef.current) {
+          // Initialize baseline of existing entry IDs
+          entries.forEach((e: any) => knownEntryIdsRef.current.add(e.id));
+          isInitialPollRef.current = false;
+          return;
+        }
+
+        // Detect newly arrived partner entries
+        for (const entry of entries) {
+          if (!knownEntryIdsRef.current.has(entry.id)) {
+            knownEntryIdsRef.current.add(entry.id);
+            if (entry.authorUid !== user.uid) {
+              setSharedEntryToast({
+                entryId: entry.id,
+                connectionId: entry.connectionId,
+                authorName: entry.authorName || 'Partner',
+                topicPreview: entry.topicPreview || 'Shared Reflection',
+                createdAt: entry.createdAt || Date.now()
+              });
+              break;
+            }
+          }
+        }
+      } catch (err) {
+        // Silently skip transient polling errors
+      }
+    };
+
+    checkForNewSharedEntries();
+    const pollInterval = setInterval(checkForNewSharedEntries, 7000);
+
+    // Also listen for same-session shared reflection events
+    const handleLocalShared = (e: any) => {
+      const detail = e.detail;
+      if (!detail) return;
+      knownEntryIdsRef.current.add(detail.entryId);
+      setSharedEntryToast({
+        entryId: detail.entryId,
+        connectionId: detail.connectionId,
+        authorName: detail.authorName || 'Partner',
+        topicPreview: detail.topicPreview || 'Shared Reflection',
+        createdAt: detail.createdAt || Date.now()
+      });
+    };
+
+    window.addEventListener('lumina:shared-entry-created', handleLocalShared);
+
+    return () => {
+      isMounted = false;
+      clearInterval(pollInterval);
+      window.removeEventListener('lumina:shared-entry-created', handleLocalShared);
+    };
   }, [user]);
 
   const loadJournals = async () => {
@@ -72,9 +158,7 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
       
       <header className="h-20 flex items-center justify-between px-6 lg:px-10 border-b border-[var(--border-color)] relative z-20 shrink-0 glass bg-[var(--header-glass-bg)]">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-violet-600 to-indigo-400 shadow-lg shadow-violet-500/20 flex items-center justify-center">
-            <Book className="w-4 h-4 text-white" />
-          </div>
+          <NeuralOrbit size={38} />
           <h1 className="text-xl font-semibold tracking-tight glow-text text-[var(--text-primary)]">Lumina</h1>
         </div>
         <div className="flex items-center gap-2.5 sm:gap-3.5">
@@ -91,11 +175,25 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
             <Search className="w-5 h-5" />
           </button>
 
+          {/* Export Audit Trail Quick Action */}
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all border bg-[var(--bg-card)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] hover:text-violet-500 dark:hover:text-violet-400 text-xs font-semibold shadow-sm"
+            title="Export Audit Trail (PDF, Markdown, JSON)"
+          >
+            <Download className="w-4 h-4 text-violet-500" />
+            <span className="hidden sm:inline">Export Audit Trail</span>
+          </button>
+
           {/* Theme Toggle Component */}
           <ThemeToggle />
 
           {/* Profile Dropdown Component */}
-          <ProfileDropdown onOpenAdmin={onOpenAdmin} onLockVault={onLockVault} />
+          <ProfileDropdown
+            onOpenAdmin={onOpenAdmin}
+            onLockVault={onLockVault}
+            onOpenExportAuditTrail={() => setShowExportModal(true)}
+          />
         </div>
       </header>
 
@@ -187,6 +285,18 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
                 <Calendar className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
                 <span>Calendar</span>
               </button>
+
+              <button
+                onClick={() => setActiveTab('collaborative')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                  activeTab === 'collaborative'
+                    ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-md shadow-violet-950/20'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5 text-purple-400" />
+                <span>Collaboration</span>
+              </button>
             </div>
 
             <button
@@ -219,6 +329,12 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
               }
               onSelectJournal(id);
             }} />
+          ) : activeTab === 'collaborative' ? (
+            <CollaborativeSection
+              onSelectJournal={(id) => onSelectJournal(id)}
+              targetEntryId={collabTargetEntryId}
+              onClearTargetEntry={() => setCollabTargetEntryId(null)}
+            />
           ) : activeTab === 'insights' ? (
             <PatternInsightsSection journals={journals} />
           ) : journals.length === 0 ? (
@@ -295,6 +411,16 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      setSharingJournal(journal);
+                    }}
+                    className="absolute top-4 right-11 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-violet-500 hover:bg-violet-500/10 opacity-0 group-hover:opacity-100 transition-all focus:opacity-100 z-10"
+                    title="Share Entry (E2EE)"
+                  >
+                    <Share2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setDeletingJournalId(journal.id);
                     }}
                     className="absolute top-4 right-4 p-1.5 rounded-lg text-[var(--text-faint)] hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all focus:opacity-100 z-10"
@@ -337,6 +463,91 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
             </div>
           </div>
         </div>
+      )}
+
+      {/* Share Entry Modal */}
+      {sharingJournal && (
+        <ShareEntryModal
+          journal={sharingJournal}
+          isOpen={!!sharingJournal}
+          onClose={() => setSharingJournal(null)}
+          onShareUpdated={(updatedConns) => {
+            setJournals(prev =>
+              prev.map(j => (j.id === sharingJournal.id ? { ...j, sharedConnections: updatedConns } : j))
+            );
+          }}
+        />
+      )}
+
+      {/* Floating Real-Time Collaborative Reflection Notification Toast */}
+      {sharedEntryToast && (
+        <div className="fixed top-24 right-6 z-50 max-w-sm w-full animate-fade-in">
+          <div
+            onClick={() => {
+              setActiveTab('collaborative');
+              setCollabTargetEntryId(sharedEntryToast.entryId);
+              setSharedEntryToast(null);
+            }}
+            className="glass rounded-2xl border border-violet-500/50 bg-[var(--bg-card)]/95 backdrop-blur-xl shadow-2xl p-4 cursor-pointer hover:border-violet-400 hover:shadow-violet-500/20 transition-all duration-200 group"
+          >
+            <div className="flex items-start gap-3">
+              {/* Indicator icon with ping badge */}
+              <div className="relative shrink-0 mt-0.5">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 to-purple-500 text-white flex items-center justify-center shadow-md shadow-violet-600/30">
+                  <Lock className="w-5 h-5" />
+                </div>
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </span>
+              </div>
+
+              {/* Toast content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3" /> New Shared Reflection
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSharedEntryToast(null);
+                    }}
+                    className="p-1 rounded-lg text-[var(--text-faint)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] transition-colors"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <h4 className="text-xs font-bold text-[var(--text-primary)] mt-1 truncate">
+                  {sharedEntryToast.authorName} shared an entry with you
+                </h4>
+
+                <p className="text-[11px] text-[var(--text-muted)] truncate mt-0.5">
+                  "{sharedEntryToast.topicPreview}"
+                </p>
+
+                <div className="mt-2.5 pt-2 border-t border-[var(--border-color)] flex items-center justify-between">
+                  <span className="text-[10px] text-[var(--text-faint)] flex items-center gap-1">
+                    <KeyRound className="w-3 h-3 text-amber-500" /> Password Protected
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-violet-600 dark:text-violet-400 group-hover:translate-x-1 transition-transform">
+                    Unlock Reflection &rarr;
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Audit Trail Modal */}
+      {showExportModal && (
+        <ExportAuditTrailModal
+          isOpen={showExportModal}
+          onClose={() => setShowExportModal(false)}
+          journals={journals}
+        />
       )}
     </div>
   );

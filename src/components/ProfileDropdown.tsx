@@ -13,7 +13,8 @@ import {
   KeyRound,
   ExternalLink,
   Zap,
-  CheckCircle2
+  CheckCircle2,
+  Download
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useAuth } from '../lib/AuthContext';
@@ -23,10 +24,11 @@ import { getPassword, clearPassword } from '../lib/crypto';
 interface ProfileDropdownProps {
   onOpenAdmin?: () => void;
   onLockVault?: () => void;
+  onOpenExportAuditTrail?: () => void;
   className?: string;
 }
 
-export default function ProfileDropdown({ onOpenAdmin, onLockVault, className = '' }: ProfileDropdownProps) {
+export default function ProfileDropdown({ onOpenAdmin, onLockVault, onOpenExportAuditTrail, className = '' }: ProfileDropdownProps) {
   const { user, isAdmin } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -267,6 +269,22 @@ export default function ProfileDropdown({ onOpenAdmin, onLockVault, className = 
                   <div className="flex-1">
                     <div>Admin Intelligence Dashboard</div>
                     <div className="text-[10px] font-normal text-[var(--text-muted)]">Platform sentiments & global trends</div>
+                  </div>
+                </button>
+              )}
+
+              {onOpenExportAuditTrail && (
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    onOpenExportAuditTrail();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] rounded-xl transition-colors cursor-pointer text-left"
+                >
+                  <Download className="w-4 h-4 text-violet-500 shrink-0" />
+                  <div className="flex-1">
+                    <div>Export Audit Trail</div>
+                    <div className="text-[10px] text-[var(--text-muted)]">PDF, Markdown & JSON backups</div>
                   </div>
                 </button>
               )}

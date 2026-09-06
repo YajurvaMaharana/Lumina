@@ -3083,6 +3083,653 @@ ${entriesToProcess.map((e: any) => `[ID: ${e.id}]\nDate: ${e.date}\nTitle: ${e.t
     }
   });
 
+  // ============================================================================================
+  // COLLABORATIVE JOURNALING — E2EE Sharing, Invites, and Gemini Joint Reflections
+  // ============================================================================================
+
+  const localCollaborativeInvites = new Map<string, any>();
+  const localCollaborativeConnections = new Map<string, any>();
+  const localSharedEntries = new Map<string, any>();
+  const localJointPrompts = new Map<string, any>();
+
+  // Helper: Generate secure invite code
+  function generateInviteCode(): string {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = 'LUM-';
+    for (let i = 0; i < 5; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  }
+
+  // 1. Create a partner invitation
+  app.post("/api/collaborative/invites", authenticateUser, async (req, res) => {
+    try {
+      const uid = (req as any).user.uid;
+      const inviterName = (req as any).user.name || (req as any).user.email?.split('@')[0] || 'Partner';
+      const { role = 'couples', autoShareTags = [] } = req.body;
+
+      const id = crypto.randomUUID();
+      const inviteCode = generateInviteCode();
+      const inviteData = {
+        id,
+        inviteCode,
+        inviterUid: uid,
+        inviterName,
+        role,
+        autoShareTags: Array.isArray(autoShareTags) ? autoShareTags : [],
+        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days
+        createdAt: Date.now(),
+        accepted: false
+      };
+
+      localCollaborativeInvites.set(inviteCode, inviteData);
+      localCollaborativeInvites.set(id, inviteData);
+
+      if (firestoreAvailable) {
+        try {
+          await db.collection('collaborative_invites').doc(id).set(inviteData);
+        } catch (_) {}
+      }
+
+      res.json({ success: true, invite: inviteData });
+    } catch (error: any) {
+      console.error('[Collaborative] Create invite error:', error);
+      res.status(500).json({ error: "Failed to create invite" });
+    }
+  });
+
+  // 2. Inspect an invitation by code (Public preview for recipient)
+  app.get("/api/collaborative/invites/:code", async (req, res) => {
+    try {
+      const code = req.params.code.trim().toUpperCase();
+      let invite = localCollaborativeInvites.get(code);
+
+      if (!invite && firestoreAvailable) {
+        try {
+          const snapshot = await db.collection('collaborative_invites').where('inviteCode', '==', code).limit(1).get();
+          if (!snapshot.empty) {
+            invite = snapshot.docs[0].data();
+            localCollaborativeInvites.set(code, invite);
+          }
+        } catch (_) {}
+      }
+
+      if (!invite) {
+        return res.status(404).json({ error: "Invite code not found or expired." });
+      }
+
+      if (invite.accepted) {
+        return res.status(410).json({ error: "This invite has already been accepted." });
+      }
+
+      if (Date.now() > invite.expiresAt) {
+        return res.status(410).json({ error: "This invite has expired." });
+      }
+
+      res.json({
+        id: invite.id,
+        inviteCode: invite.inviteCode,
+        inviterName: invite.inviterName,
+        role: invite.role,
+        autoShareTags: invite.autoShareTags,
+        expiresAt: invite.expiresAt,
+        createdAt: invite.createdAt
+      });
+    } catch (error: any) {
+      console.error('[Collaborative] Fetch invite error:', error);
+      res.status(500).json({ error: "Failed to fetch invite" });
+    }
+  });
+
+  // 3. Accept an invitation & establish partner connection
+  app.post("/api/collaborative/invites/accept", authenticateUser, async (req, res) => {
+    try {
+      const uid = (req as any).user.uid;
+      const partnerName = (req as any).user.name || (req as any).user.email?.split('@')[0] || 'Partner';
+      const { inviteCode } = req.body;
+
+      if (!inviteCode) {
+        return res.status(400).json({ error: "Invite code is required." });
+      }
+
+      const code = inviteCode.trim().toUpperCase();
+      let invite = localCollaborativeInvites.get(code);
+
+      if (!invite && firestoreAvailable) {
+        try {
+          const snapshot = await db.collection('collaborative_invites').where('inviteCode', '==', code).limit(1).get();
+          if (!snapshot.empty) {
+            invite = snapshot.docs[0].data();
+          }
+        } catch (_) {}
+      }
+
+      if (!invite) {
+        return res.status(404).json({ error: "Invalid invite code." });
+      }
+
+      if (invite.inviterUid === uid) {
+        return res.status(400).json({ error: "You cannot accept your own invitation." });
+      }
+
+      if (invite.accepted) {
+        return res.status(410).json({ error: "This invitation has already been used." });
+      }
+
+      const connectionId = crypto.randomUUID();
+      const connectionData = {
+        id: connectionId,
+        inviterUid: invite.inviterUid,
+        inviterName: invite.inviterName,
+        partnerUid: uid,
+        partnerName: partnerName,
+        role: invite.role,
+        status: 'accepted',
+        createdAt: invite.createdAt,
+        acceptedAt: Date.now(),
+        autoShareTags: invite.autoShareTags || [],
+        inviteCode: invite.inviteCode
+      };
+
+      // Mark invite accepted
+      invite.accepted = true;
+      invite.acceptedByUid = uid;
+      invite.acceptedByName = partnerName;
+      localCollaborativeInvites.set(code, invite);
+
+      // Store connection
+      localCollaborativeConnections.set(connectionId, connectionData);
+
+      if (firestoreAvailable) {
+        try {
+          await db.collection('collaborative_invites').doc(invite.id).set(invite, { merge: true });
+          await db.collection('collaborative_connections').doc(connectionId).set(connectionData);
+        } catch (_) {}
+      }
+
+      res.json({ success: true, connection: connectionData });
+    } catch (error: any) {
+      console.error('[Collaborative] Accept invite error:', error);
+      res.status(500).json({ error: "Failed to accept invite" });
+    }
+  });
+
+  // 4. Get active partner connections for authenticated user
+  app.get("/api/collaborative/connections", authenticateUser, async (req, res) => {
+    try {
+      const uid = (req as any).user.uid;
+      const userConnections: any[] = [];
+
+      // Read from local memory
+      for (const conn of localCollaborativeConnections.values()) {
+        if ((conn.inviterUid === uid || conn.partnerUid === uid) && conn.status === 'accepted') {
+          userConnections.push(conn);
+        }
+      }
+
+      // Check Firestore if available
+      if (firestoreAvailable) {
+        try {
+          const snapA = await db.collection('collaborative_connections').where('inviterUid', '==', uid).where('status', '==', 'accepted').get();
+          snapA.forEach(doc => {
+            if (!userConnections.some(c => c.id === doc.id)) userConnections.push(doc.data());
+          });
+          const snapB = await db.collection('collaborative_connections').where('partnerUid', '==', uid).where('status', '==', 'accepted').get();
+          snapB.forEach(doc => {
+            if (!userConnections.some(c => c.id === doc.id)) userConnections.push(doc.data());
+          });
+        } catch (_) {}
+      }
+
+      res.json({ connections: userConnections });
+    } catch (error: any) {
+      console.error('[Collaborative] Fetch connections error:', error);
+      res.status(500).json({ error: "Failed to fetch connections" });
+    }
+  });
+
+  // 5. Disconnect partner & revoke connection
+  app.delete("/api/collaborative/connections/:id", authenticateUser, async (req, res) => {
+    try {
+      const uid = (req as any).user.uid;
+      const connectionId = req.params.id;
+
+      let conn = localCollaborativeConnections.get(connectionId);
+      if (!conn && firestoreAvailable) {
+        try {
+          const doc = await db.collection('collaborative_connections').doc(connectionId).get();
+          if (doc.exists) conn = doc.data();
+        } catch (_) {}
+      }
+
+      if (!conn) {
+        return res.status(404).json({ error: "Connection not found." });
+      }
+
+      if (conn.inviterUid !== uid && conn.partnerUid !== uid) {
+        return res.status(403).json({ error: "Unauthorized to disconnect this partner." });
+      }
+
+      // Mark disconnected
+      conn.status = 'disconnected';
+      conn.disconnectedAt = Date.now();
+      localCollaborativeConnections.set(connectionId, conn);
+
+      // Purge shared entries for this connection to guarantee revocation
+      for (const [entryId, entry] of localSharedEntries.entries()) {
+        if (entry.connectionId === connectionId) {
+          localSharedEntries.delete(entryId);
+        }
+      }
+
+      if (firestoreAvailable) {
+        try {
+          await db.collection('collaborative_connections').doc(connectionId).set(conn, { merge: true });
+          const entriesSnap = await db.collection('collaborative_entries').where('connectionId', '==', connectionId).get();
+          const batch = db.batch();
+          entriesSnap.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+        } catch (_) {}
+      }
+
+      res.json({ success: true, message: "Partner disconnected and all shared entries revoked." });
+    } catch (error: any) {
+      console.error('[Collaborative] Disconnect error:', error);
+      res.status(500).json({ error: "Failed to disconnect partner" });
+    }
+  });
+
+  // 6. Update auto-share tags for a connection
+  app.post("/api/collaborative/connections/:id/tags", authenticateUser, async (req, res) => {
+    try {
+      const uid = (req as any).user.uid;
+      const connectionId = req.params.id;
+      const { autoShareTags = [] } = req.body;
+
+      let conn = localCollaborativeConnections.get(connectionId);
+      if (!conn && firestoreAvailable) {
+        try {
+          const doc = await db.collection('collaborative_connections').doc(connectionId).get();
+          if (doc.exists) conn = doc.data();
+        } catch (_) {}
+      }
+
+      if (!conn) {
+        return res.status(404).json({ error: "Connection not found." });
+      }
+
+      if (conn.inviterUid !== uid && conn.partnerUid !== uid) {
+        return res.status(403).json({ error: "Unauthorized." });
+      }
+
+      conn.autoShareTags = Array.isArray(autoShareTags) ? autoShareTags : [];
+      localCollaborativeConnections.set(connectionId, conn);
+
+      if (firestoreAvailable) {
+        try {
+          await db.collection('collaborative_connections').doc(connectionId).set({ autoShareTags: conn.autoShareTags }, { merge: true });
+        } catch (_) {}
+      }
+
+      res.json({ success: true, connection: conn });
+    } catch (error: any) {
+      console.error('[Collaborative] Update tags error:', error);
+      res.status(500).json({ error: "Failed to update tags" });
+    }
+  });
+
+  // 7. Publish an end-to-end encrypted journal entry to a connection
+  app.post("/api/collaborative/entries", authenticateUser, async (req, res) => {
+    try {
+      const uid = (req as any).user.uid;
+      const authorName = (req as any).user.name || (req as any).user.email?.split('@')[0] || 'Author';
+      const { originalJournalId, connectionId, encryptedPayload, tags = [], topicPreview = '', accessHash, isPasswordProtected } = req.body;
+
+      if (!connectionId || !encryptedPayload?.ciphertext || !encryptedPayload?.iv) {
+        return res.status(400).json({ error: "Invalid shared entry payload. Ciphertext and connectionId are required." });
+      }
+
+      let conn = localCollaborativeConnections.get(connectionId);
+      if (!conn && firestoreAvailable) {
+        try {
+          const doc = await db.collection('collaborative_connections').doc(connectionId).get();
+          if (doc.exists) conn = doc.data();
+        } catch (_) {}
+      }
+
+      if (!conn || conn.status !== 'accepted') {
+        return res.status(404).json({ error: "Active partner connection not found." });
+      }
+
+      if (conn.inviterUid !== uid && conn.partnerUid !== uid) {
+        return res.status(403).json({ error: "Unauthorized to share to this connection." });
+      }
+
+      const partnerUid = conn.inviterUid === uid ? conn.partnerUid : conn.inviterUid;
+      const entryId = crypto.randomUUID();
+
+      const entryData = {
+        id: entryId,
+        originalJournalId: originalJournalId || entryId,
+        connectionId,
+        authorUid: uid,
+        authorName,
+        partnerUid,
+        role: conn.role,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        tags: Array.isArray(tags) ? tags : [],
+        accessHash: accessHash || (encryptedPayload as any)?.accessHash || '',
+        isPasswordProtected: isPasswordProtected !== undefined ? !!isPasswordProtected : true,
+        encryptedPayload: {
+          ciphertext: encryptedPayload.ciphertext,
+          salt: encryptedPayload.salt || '',
+          iv: encryptedPayload.iv
+        },
+        topicPreview: topicPreview ? String(topicPreview).slice(0, 150) : ''
+      };
+
+      localSharedEntries.set(entryId, entryData);
+
+      if (firestoreAvailable) {
+        try {
+          await db.collection('collaborative_entries').doc(entryId).set(entryData);
+        } catch (_) {}
+      }
+
+      res.json({ success: true, entry: entryData });
+    } catch (error: any) {
+      console.error('[Collaborative] Publish entry error:', error);
+      res.status(500).json({ error: "Failed to publish shared entry" });
+    }
+  });
+
+  // 8. Fetch shared entries for the user
+  app.get("/api/collaborative/entries", authenticateUser, async (req, res) => {
+    try {
+      const uid = (req as any).user.uid;
+      const { connectionId } = req.query;
+
+      const entries: any[] = [];
+
+      for (const entry of localSharedEntries.values()) {
+        const matchesUser = entry.authorUid === uid || entry.partnerUid === uid;
+        const matchesConn = !connectionId || entry.connectionId === connectionId;
+        if (matchesUser && matchesConn) {
+          entries.push(entry);
+        }
+      }
+
+      if (firestoreAvailable) {
+        try {
+          let qA = db.collection('collaborative_entries').where('authorUid', '==', uid);
+          let qB = db.collection('collaborative_entries').where('partnerUid', '==', uid);
+          if (connectionId) {
+            qA = qA.where('connectionId', '==', connectionId);
+            qB = qB.where('connectionId', '==', connectionId);
+          }
+          const [snapA, snapB] = await Promise.all([qA.get(), qB.get()]);
+          snapA.forEach(d => { if (!entries.some(e => e.id === d.id)) entries.push(d.data()); });
+          snapB.forEach(d => { if (!entries.some(e => e.id === d.id)) entries.push(d.data()); });
+        } catch (_) {}
+      }
+
+      // Sort by newest first
+      entries.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+      res.json({ entries });
+    } catch (error: any) {
+      console.error('[Collaborative] Fetch entries error:', error);
+      res.status(500).json({ error: "Failed to fetch shared entries" });
+    }
+  });
+
+  // 9. Revoke an individual shared entry
+  app.delete("/api/collaborative/entries/:id", authenticateUser, async (req, res) => {
+    try {
+      const uid = (req as any).user.uid;
+      const entryId = req.params.id;
+
+      let entry = localSharedEntries.get(entryId);
+      if (!entry && firestoreAvailable) {
+        try {
+          const doc = await db.collection('collaborative_entries').doc(entryId).get();
+          if (doc.exists) entry = doc.data();
+        } catch (_) {}
+      }
+
+      if (!entry) {
+        return res.status(404).json({ error: "Shared entry not found." });
+      }
+
+      if (entry.authorUid !== uid) {
+        return res.status(403).json({ error: "Only the author can revoke this shared entry." });
+      }
+
+      localSharedEntries.delete(entryId);
+
+      if (firestoreAvailable) {
+        try {
+          await db.collection('collaborative_entries').doc(entryId).delete();
+        } catch (_) {}
+      }
+
+      res.json({ success: true, message: "Entry sharing revoked." });
+    } catch (error: any) {
+      console.error('[Collaborative] Delete entry error:', error);
+      res.status(500).json({ error: "Failed to revoke shared entry" });
+    }
+  });
+
+  // 10. AI Joint Reflection Prompts (Gemini API integration)
+  app.post("/api/collaborative/joint-prompt", authenticateUser, async (req, res) => {
+    try {
+      const uid = (req as any).user.uid;
+      const { connectionId, role = 'couples', themes = [], recentSnippets = [] } = req.body;
+
+      if (!connectionId) {
+        return res.status(400).json({ error: "connectionId is required." });
+      }
+
+      let conn = localCollaborativeConnections.get(connectionId);
+      if (!conn && firestoreAvailable) {
+        try {
+          const doc = await db.collection('collaborative_connections').doc(connectionId).get();
+          if (doc.exists) conn = doc.data();
+        } catch (_) {}
+      }
+
+      if (!conn || (conn.inviterUid !== uid && conn.partnerUid !== uid)) {
+        return res.status(403).json({ error: "Unauthorized access to this partner connection." });
+      }
+
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "Gemini API key is not configured." });
+      }
+
+      const ai = new GoogleGenAI({ apiKey });
+
+      const themesText = themes.length > 0 ? `Shared Themes/Tags: ${themes.join(', ')}` : 'Themes: General alignment, emotional wellness, mutual support';
+      const contextText = recentSnippets.length > 0 ? `Recent Reflection Topics:\n- ${recentSnippets.join('\n- ')}` : '';
+
+      const roleInstructions: Record<string, string> = {
+        couples: `You are an empathetic relationship counselor and couples journaling facilitator. Your goal is to foster deep emotional connection, mutual appreciation, psychological safety, and compassionate understanding between romantic partners. Avoid judgment or taking sides.`,
+        accountability: `You are a high-performance accountability coach and behavioral partner facilitator. Your goal is to help two accountability partners reflect constructively on their habit loops, identify friction points, celebrate milestones, and define clear, supportive commitments.`,
+        friend: `You are a thoughtful personal growth facilitator for close friends. Your goal is to inspire joyful curiosity, meaningful vulnerability, gratitude, and mutual encouragement.`
+      };
+
+      const systemInstruction = roleInstructions[role] || roleInstructions.couples;
+
+      const userPrompt = `${systemInstruction}
+Based on the following mutual context, generate 3 unique, deeply constructive joint reflection prompts for these two partners to answer together:
+${themesText}
+${contextText}
+
+OUTPUT REQUIREMENTS:
+Respond in valid JSON only with this schema:
+{
+  "prompts": [
+    {
+      "theme": "A short 2-4 word topic (e.g., 'Holding Space', 'Overcoming Friction', 'Weekly Alignment')",
+      "prompt": "A warm, insightful 1-2 sentence reflection question that invites both partners to share their perspective and feelings."
+    }
+  ]
+}`;
+
+      let promptsResult: any[] = [];
+      const models = ["gemini-2.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest", "gemini-3.8-flash"];
+
+      for (const model of models) {
+        try {
+          const result = await ai.models.generateContent({
+            model,
+            contents: userPrompt,
+            config: {
+              responseMimeType: "application/json"
+            }
+          });
+          const text = result.text || "";
+          const parsed = JSON.parse(text);
+          if (Array.isArray(parsed.prompts) && parsed.prompts.length > 0) {
+            promptsResult = parsed.prompts;
+            break;
+          }
+        } catch (mErr: any) {
+          console.warn(`[Collaborative Prompt] Model ${model} failed, trying next:`, mErr?.message || mErr);
+        }
+      }
+
+      // High-quality fallback if Gemini is rate limited
+      if (promptsResult.length === 0) {
+        if (role === 'accountability') {
+          promptsResult = [
+            {
+              theme: "Friction & Breakthroughs",
+              prompt: "What was the single biggest friction point or procrastination trigger you encountered this week, and how can we support each other in removing it?"
+            },
+            {
+              theme: "Habit Milestone",
+              prompt: "What is one small victory or consistent action you took this week that you feel proud of, and what gave you the momentum to do it?"
+            },
+            {
+              theme: "Forward Commitment",
+              prompt: "Looking at the upcoming week, what is the #1 non-negotiable standard you want to hold for yourself, and what check-in rhythm would serve you best?"
+            }
+          ];
+        } else {
+          promptsResult = [
+            {
+              theme: "Emotional Attunement",
+              prompt: "When you reflect on this past week, what moment did you feel most understood or supported, and where did you secretly feel carrying a heavy mental load?"
+            },
+            {
+              theme: "Holding Space",
+              prompt: "How can we create 20 minutes of intentional, undistracted presence for each other this evening without feeling rushed or distracted?"
+            },
+            {
+              theme: "Shared Gratitude",
+              prompt: "What is a subtle quality or gesture in each other this week that you deeply appreciated, but perhaps forgot to mention out loud?"
+            }
+          ];
+        }
+      }
+
+      // Save generated prompts
+      const savedPrompts = promptsResult.map(p => {
+        const promptId = crypto.randomUUID();
+        const obj = {
+          id: promptId,
+          connectionId,
+          prompt: p.prompt,
+          theme: p.theme,
+          role,
+          createdAt: Date.now()
+        };
+        localJointPrompts.set(promptId, obj);
+        return obj;
+      });
+
+      res.json({ success: true, prompts: savedPrompts });
+    } catch (error: any) {
+      console.error('[Collaborative] Joint prompt error:', error);
+      res.status(500).json({ error: "Failed to generate joint prompt" });
+    }
+  });
+
+  // 11. Fetch joint reflection prompts for a connection
+  app.get("/api/collaborative/joint-prompts", authenticateUser, async (req, res) => {
+    try {
+      const uid = (req as any).user.uid;
+      const { connectionId } = req.query;
+
+      if (!connectionId || typeof connectionId !== 'string') {
+        return res.status(400).json({ error: "connectionId is required." });
+      }
+
+      const prompts: any[] = [];
+      for (const p of localJointPrompts.values()) {
+        if (p.connectionId === connectionId) {
+          prompts.push(p);
+        }
+      }
+
+      prompts.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      res.json({ prompts });
+    } catch (error: any) {
+      console.error('[Collaborative] Fetch joint prompts error:', error);
+      res.status(500).json({ error: "Failed to fetch joint prompts" });
+    }
+  });
+
+  // 12. Respond to a joint reflection prompt
+  app.post("/api/collaborative/joint-prompts/:id/respond", authenticateUser, async (req, res) => {
+    try {
+      const uid = (req as any).user.uid;
+      const promptId = req.params.id;
+      const { text } = req.body;
+
+      if (!text || !text.trim()) {
+        return res.status(400).json({ error: "Response text is required." });
+      }
+
+      let prompt = localJointPrompts.get(promptId);
+      if (!prompt) {
+        return res.status(404).json({ error: "Joint prompt not found." });
+      }
+
+      const conn = localCollaborativeConnections.get(prompt.connectionId);
+      if (!conn || (conn.inviterUid !== uid && conn.partnerUid !== uid)) {
+        return res.status(403).json({ error: "Unauthorized." });
+      }
+
+      const authorName = (req as any).user.name || (req as any).user.email?.split('@')[0] || 'Partner';
+      const isInviter = conn.inviterUid === uid;
+
+      if (isInviter) {
+        prompt.partnerA_response = {
+          text: text.trim(),
+          authorName,
+          updatedAt: Date.now()
+        };
+      } else {
+        prompt.partnerB_response = {
+          text: text.trim(),
+          authorName,
+          updatedAt: Date.now()
+        };
+      }
+
+      localJointPrompts.set(promptId, prompt);
+
+      res.json({ success: true, prompt });
+    } catch (error: any) {
+      console.error('[Collaborative] Respond prompt error:', error);
+      res.status(500).json({ error: "Failed to save response" });
+    }
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({

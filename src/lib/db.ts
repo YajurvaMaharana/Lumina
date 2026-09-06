@@ -261,3 +261,174 @@ export const saveCalendarIntegrationStatus = async (userId: string, settings: Ca
   const docRef = doc(db, 'users', userId, 'integrations', 'calendar');
   await setDoc(docRef, settings, { merge: true });
 };
+
+// ============================================================================
+// COLLABORATIVE JOURNALING CLIENT HELPERS
+// ============================================================================
+
+// Helper: Extract #hashtags from text
+export const extractTagsFromText = (text: string): string[] => {
+  if (!text) return [];
+  const matches = text.match(/#[a-zA-Z0-9_\-]+/g);
+  if (!matches) return [];
+  return Array.from(new Set(matches.map(t => t.toLowerCase())));
+};
+
+// API: Fetch partner connections
+export const fetchCollaborativeConnections = async (idToken: string) => {
+  const res = await fetch('/api/collaborative/connections', {
+    headers: { 'Authorization': `Bearer ${idToken}` }
+  });
+  if (!res.ok) throw new Error('Failed to fetch connections');
+  return (await res.json()).connections;
+};
+
+// API: Create an invitation
+export const createCollaborativeInvite = async (
+  idToken: string,
+  role: 'couples' | 'accountability' | 'friend',
+  autoShareTags: string[]
+) => {
+  const res = await fetch('/api/collaborative/invites', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`
+    },
+    body: JSON.stringify({ role, autoShareTags })
+  });
+  if (!res.ok) throw new Error('Failed to create invite');
+  return (await res.json()).invite;
+};
+
+// API: Accept an invitation
+export const acceptCollaborativeInvite = async (idToken: string, inviteCode: string) => {
+  const res = await fetch('/api/collaborative/invites/accept', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`
+    },
+    body: JSON.stringify({ inviteCode })
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to accept invite');
+  }
+  return (await res.json()).connection;
+};
+
+// API: Disconnect partner
+export const disconnectCollaborativePartner = async (idToken: string, connectionId: string) => {
+  const res = await fetch(`/api/collaborative/connections/${connectionId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${idToken}` }
+  });
+  if (!res.ok) throw new Error('Failed to disconnect partner');
+  return await res.json();
+};
+
+// API: Update auto-share tags
+export const updateConnectionTags = async (idToken: string, connectionId: string, autoShareTags: string[]) => {
+  const res = await fetch(`/api/collaborative/connections/${connectionId}/tags`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`
+    },
+    body: JSON.stringify({ autoShareTags })
+  });
+  if (!res.ok) throw new Error('Failed to update tags');
+  return (await res.json()).connection;
+};
+
+// API: Publish an encrypted entry to a connection
+export const publishSharedEntry = async (
+  idToken: string,
+  data: {
+    originalJournalId: string;
+    connectionId: string;
+    encryptedPayload: { ciphertext: string; salt: string; iv: string };
+    accessHash?: string;
+    isPasswordProtected?: boolean;
+    tags: string[];
+    topicPreview?: string;
+  }
+) => {
+  const res = await fetch('/api/collaborative/entries', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`
+    },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error('Failed to share entry');
+  return (await res.json()).entry;
+};
+
+// API: Fetch shared entries
+export const fetchSharedEntries = async (idToken: string, connectionId?: string) => {
+  const url = connectionId ? `/api/collaborative/entries?connectionId=${encodeURIComponent(connectionId)}` : '/api/collaborative/entries';
+  const res = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${idToken}` }
+  });
+  if (!res.ok) throw new Error('Failed to fetch shared entries');
+  return (await res.json()).entries;
+};
+
+// API: Revoke an entry
+export const revokeSharedEntry = async (idToken: string, entryId: string) => {
+  const res = await fetch(`/api/collaborative/entries/${entryId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${idToken}` }
+  });
+  if (!res.ok) throw new Error('Failed to revoke entry');
+  return await res.json();
+};
+
+// API: Generate AI joint reflection prompt
+export const generateJointPrompt = async (
+  idToken: string,
+  params: {
+    connectionId: string;
+    role: string;
+    themes?: string[];
+    recentSnippets?: string[];
+  }
+) => {
+  const res = await fetch('/api/collaborative/joint-prompt', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`
+    },
+    body: JSON.stringify(params)
+  });
+  if (!res.ok) throw new Error('Failed to generate joint prompt');
+  return (await res.json()).prompts;
+};
+
+// API: Fetch joint reflection prompts
+export const fetchJointPrompts = async (idToken: string, connectionId: string) => {
+  const res = await fetch(`/api/collaborative/joint-prompts?connectionId=${encodeURIComponent(connectionId)}`, {
+    headers: { 'Authorization': `Bearer ${idToken}` }
+  });
+  if (!res.ok) throw new Error('Failed to fetch joint prompts');
+  return (await res.json()).prompts;
+};
+
+// API: Respond to a joint reflection prompt
+export const respondToJointPrompt = async (idToken: string, promptId: string, text: string) => {
+  const res = await fetch(`/api/collaborative/joint-prompts/${promptId}/respond`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${idToken}`
+    },
+    body: JSON.stringify({ text })
+  });
+  if (!res.ok) throw new Error('Failed to submit response');
+  return (await res.json()).prompt;
+};
+
