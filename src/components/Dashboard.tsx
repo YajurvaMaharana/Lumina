@@ -18,6 +18,7 @@ import ShareEntryModal from './ShareEntryModal';
 import ExportAuditTrailModal from './ExportAuditTrailModal';
 import ThemeToggle from './ThemeToggle';
 import ProfileDropdown from './ProfileDropdown';
+import DailyStreakBadge from './DailyStreakBadge';
 import NeuralOrbit, { NeuralOrbitLoader } from './NeuralOrbit';
 
 interface DashboardProps {
@@ -387,6 +388,13 @@ export default function Dashboard({
             introPhase === 'splash' ? 'opacity-0' : 'opacity-100'
           }`}
         >
+          {/* Daily Streak Tracker Component */}
+          <DailyStreakBadge
+            journals={journals}
+            userId={user?.uid}
+            onOpenNewEntry={() => onSelectJournal('new')}
+          />
+
           {/* Ask Journal Quick Action */}
           <button
             onClick={() => setActiveTab('ask')}

@@ -107,6 +107,20 @@ html.light ::-webkit-scrollbar-thumb:hover {
   .reflection-mask {
     mask-image: linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%);
   }
+  .animate-flame {
+    animation: flamePulse 2.2s infinite ease-in-out;
+  }
+}
+
+@keyframes flamePulse {
+  0%, 100% {
+    transform: scale(1) rotate(-1deg);
+    filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.7));
+  }
+  50% {
+    transform: scale(1.1) rotate(1deg);
+    filter: drop-shadow(0 0 10px rgba(239, 68, 68, 0.85));
+  }
 }
 
 /* ========================================================================= */
