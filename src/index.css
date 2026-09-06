@@ -21,19 +21,19 @@
 html.light {
   --bg-primary: #f8fafc;
   --bg-secondary: #f1f5f9;
-  --bg-card: #ffffff;
-  --bg-card-hover: #f1f5f9;
+  --bg-card: rgba(255, 255, 255, 0.75);
+  --bg-card-hover: rgba(255, 255, 255, 0.90);
   --text-primary: #0f172a;
-  --text-secondary: #1e293b;
+  --text-secondary: #334155;
   --text-muted: #475569;
   --text-faint: #64748b;
-  --border-color: rgba(15, 23, 42, 0.12);
-  --border-subtle: rgba(15, 23, 42, 0.06);
-  --glow-color: rgba(124, 58, 237, 0.2);
+  --border-color: rgba(15, 23, 42, 0.08);
+  --border-subtle: rgba(15, 23, 42, 0.04);
+  --glow-color: rgba(124, 58, 237, 0.15);
   --atmosphere-1: #e0e7ff;
   --atmosphere-2: #ede9fe;
-  --atmosphere-opacity: 0.65;
-  --header-glass-bg: rgba(255, 255, 255, 0.88);
+  --atmosphere-opacity: 0.55;
+  --header-glass-bg: rgba(255, 255, 255, 0.78);
 }
 
 html {
@@ -80,10 +80,10 @@ body {
   background: rgba(255, 255, 255, 0.3);
 }
 html.light ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(15, 23, 42, 0.15);
 }
 html.light ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(15, 23, 42, 0.3);
 }
 
 @layer utilities {
@@ -110,7 +110,7 @@ html.light ::-webkit-scrollbar-thumb:hover {
 }
 
 /* ========================================================================= */
-/* LIGHT MODE GLOBAL TEXT, CONTRAST, AND COMPONENT CARD STYLING RULES        */
+/* LIGHT MODE GLOBAL LIQUID GLASS, TEXT CONTRAST & SURFACE STYLING RULES     */
 /* ========================================================================= */
 html.light {
   color-scheme: light;
@@ -127,33 +127,74 @@ html.light h6:not([class*="text-violet"]):not([class*="text-indigo"]) {
 }
 
 html.light .glow-text {
-  text-shadow: none;
+  text-shadow: 0 0 12px rgba(124, 58, 237, 0.15);
 }
 
-/* 2. Light Mode Glass & Surface Cards */
+/* 2. Frosted Liquid Glass Surfaces in Light Mode */
 html.light .glass {
-  background-color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05), inset 0 1px 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+html.light .glass:hover {
+  background: rgba(255, 255, 255, 0.90) !important;
   border-color: rgba(15, 23, 42, 0.12) !important;
-  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.03) !important;
+  box-shadow: 0 12px 36px 0 rgba(31, 38, 135, 0.07), inset 0 1px 1px 0 rgba(255, 255, 255, 0.95) !important;
+}
+
+html.light header {
+  background: rgba(255, 255, 255, 0.78) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-bottom-color: rgba(15, 23, 42, 0.08) !important;
+}
+
+html.light nav[aria-label="Dashboard sections"] {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border-color: rgba(15, 23, 42, 0.09) !important;
+  box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.05), inset 0 1px 1px 0 rgba(255, 255, 255, 0.9) !important;
+}
+
+html.light nav[aria-label="Dashboard sections"] button:not(.bg-violet-600):not(.bg-indigo-600):not(.bg-cyan-600):not(.bg-pink-600):not(.bg-purple-600):not(.bg-emerald-600):not(.bg-blue-600):not([class*="bg-gradient-"]) {
+  color: #475569 !important;
+}
+
+html.light nav[aria-label="Dashboard sections"] button:not(.bg-violet-600):not(.bg-indigo-600):not(.bg-cyan-600):not(.bg-pink-600):not(.bg-purple-600):not(.bg-emerald-600):not(.bg-blue-600):not([class*="bg-gradient-"]):hover {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  color: #0f172a !important;
 }
 
 html.light .bg-\[\#05070A\],
 html.light .bg-\[\#0B0F19\],
 html.light .bg-\[\#05070D\],
 html.light .bg-\[\#05070E\],
-html.light .bg-\[\#0c1017\],
+html.light .bg-\[\#0c1017\] {
+  background-color: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-color: rgba(15, 23, 42, 0.09) !important;
+  color: #1e293b !important;
+  box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.06), inset 0 1px 1px rgba(255, 255, 255, 0.9) !important;
+}
+
 html.light .bg-black\/30,
-html.light .bg-black\/40 {
-  background-color: #ffffff !important;
-  border-color: rgba(15, 23, 42, 0.12) !important;
+html.light .bg-black\/40,
+html.light .bg-black\/50,
+html.light .bg-black\/60 {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(20px) !important;
+  border-color: rgba(15, 23, 42, 0.09) !important;
   color: #1e293b !important;
 }
 
-html.light .bg-black\/60,
 html.light .bg-black\/80 {
-  background-color: #f8fafc !important;
-  border-color: rgba(15, 23, 42, 0.14) !important;
-  color: #1e293b !important;
+  background-color: rgba(15, 23, 42, 0.35) !important;
+  backdrop-filter: blur(12px) !important;
 }
 
 /* 3. Subtle Frosted Glass & Surface Card Backgrounds */
@@ -163,21 +204,23 @@ html.light .bg-white\/\[0\.03\],
 html.light .bg-white\/\[0\.04\],
 html.light .bg-white\/\[0\.05\],
 html.light .bg-white\/\[0\.06\] {
-  background-color: #ffffff !important;
-  border-color: rgba(15, 23, 42, 0.12) !important;
-  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05) !important;
+  background-color: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
+  box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.04), inset 0 1px 1px 0 rgba(255, 255, 255, 0.85) !important;
   color: #1e293b !important;
 }
 
 html.light .bg-white\/5 {
-  background-color: #f8fafc !important;
-  border-color: rgba(15, 23, 42, 0.12) !important;
+  background-color: rgba(255, 255, 255, 0.65) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
   color: #1e293b !important;
 }
 
 html.light .bg-white\/10 {
-  background-color: #f1f5f9 !important;
-  border-color: rgba(15, 23, 42, 0.14) !important;
+  background-color: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(15, 23, 42, 0.1) !important;
   color: #1e293b !important;
 }
 
@@ -185,14 +228,14 @@ html.light .bg-white\/5:hover,
 html.light .hover\:bg-white\/5:hover,
 html.light .hover\:bg-white\/10:hover,
 html.light .hover\:bg-white\/\[0\.04\]:hover {
-  background-color: #f1f5f9 !important;
+  background-color: rgba(255, 255, 255, 0.95) !important;
 }
 
 html.light .border-white\/5,
 html.light .border-white\/10,
 html.light .border-white\/15,
 html.light .border-white\/20 {
-  border-color: rgba(15, 23, 42, 0.12) !important;
+  border-color: rgba(15, 23, 42, 0.08) !important;
 }
 
 /* 4. Autonomous Agent Orchestrator Header & Gradient Surfaces in Light Mode */

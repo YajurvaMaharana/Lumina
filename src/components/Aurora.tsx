@@ -107,11 +107,11 @@ void main() {
   
   if (uLightMode > 0.5) {
     float energy = clamp(max(intensity, 0.0), 0.0, 1.0);
-    float coverage = clamp(auroraAlpha * (0.55 + 0.45 * energy), 0.0, 0.86);
-    vec3 chroma = pow(clamp(rampColor, 0.0, 1.0), vec3(1.2));
-    float chromaPeak = max(chroma.r, max(chroma.g, chroma.b));
-    chroma /= max(chromaPeak, 0.0001);
-    fragColor = vec4(mix(vec3(1.0), chroma, min(coverage * 1.08, 0.94)), 1.0);
+    float coverage = clamp(auroraAlpha * (0.6 + 0.4 * energy), 0.0, 1.0);
+    // Soft luminous bright base (#fafbff)
+    vec3 lightBg = vec3(0.982, 0.985, 0.992);
+    // Gracefully mix the soft pastel rampColor (#E2D9F3, #C7F3E2, #F3D9E9) to keep fluid waves bright and visible
+    fragColor = vec4(mix(lightBg, rampColor, coverage * 0.88), 1.0);
   } else {
     fragColor = vec4(auroraColor * auroraAlpha, auroraAlpha);
   }
@@ -131,9 +131,9 @@ export interface AuroraProps {
 
 export default function Aurora(props: AuroraProps) {
   const {
-    colorStops = ['#7c3aed', '#06b6d4', '#4338ca'],
-    amplitude = 1.0,
-    blend = 0.5,
+    colorStops = props.lightMode ? ['#E2D9F3', '#C7F3E2', '#F3D9E9'] : ['#7c3aed', '#06b6d4', '#4338ca'],
+    amplitude = props.lightMode ? 0.8 : 1.0,
+    blend = 0.6,
     lightMode = false,
     className = '',
     style
@@ -210,9 +210,9 @@ export default function Aurora(props: AuroraProps) {
 
     const update = (t: number) => {
       animateId = requestAnimationFrame(update);
-      const { time = t * 0.01, speed = 1.0 } = propsRef.current;
+      const { time = t * 0.01, speed = 0.4 } = propsRef.current;
       program.uniforms.uTime.value = time * speed * 0.1;
-      program.uniforms.uAmplitude.value = propsRef.current.amplitude ?? 1.0;
+      program.uniforms.uAmplitude.value = propsRef.current.amplitude ?? amplitude;
       program.uniforms.uBlend.value = propsRef.current.blend ?? blend;
       program.uniforms.uLightMode.value = (propsRef.current.lightMode ?? lightMode) ? 1 : 0;
       const stops = propsRef.current.colorStops ?? colorStops;
@@ -236,7 +236,7 @@ export default function Aurora(props: AuroraProps) {
       }
       gl.getExtension('WEBGL_lose_context')?.loseContext();
     };
-  }, [amplitude, blend, lightMode, colorStops]);
+  }, []);
 
   return (
     <div

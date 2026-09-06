@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './lib/AuthContext';
-import { ThemeProvider } from './lib/ThemeContext';
+import { ThemeProvider, useTheme } from './lib/ThemeContext';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import JournalView from './components/JournalView';
@@ -18,6 +18,7 @@ import StartupIntro from './components/StartupIntro';
 
 function AppContent() {
   const { user, loading } = useAuth();
+  const { theme } = useTheme();
   const [view, setView] = useState<'dashboard' | 'admin' | 'journal'>('dashboard');
   const [selectedJournalId, setSelectedJournalId] = useState<string | null>(null);
   const [hasPassword, setHasPassword] = useState(false);
@@ -40,10 +41,15 @@ function AppContent() {
       {/* Full-viewport Aurora WebGL Background Layer */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <Aurora
-          colorStops={['#7c3aed', '#06b6d4', '#4338ca']}
+          colorStops={
+            theme === 'light'
+              ? ['#E2D9F3', '#C7F3E2', '#F3D9E9']
+              : ['#7c3aed', '#06b6d4', '#4338ca']
+          }
           blend={0.6}
-          amplitude={1.0}
-          speed={0.5}
+          amplitude={theme === 'light' ? 0.8 : 1.0}
+          speed={0.4}
+          lightMode={theme === 'light'}
         />
       </div>
 
