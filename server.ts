@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
@@ -82,18 +85,18 @@ async function startServer() {
     );
   }
 
-  function generateContextualJournalResponse(message: string, history: any[] = []): string {
-    const text = (message || "").toLowerCase();
-    if (text.includes("trade") || text.includes("btc") || text.includes("market") || text.includes("loss") || text.includes("profit")) {
-      return "Thank you for documenting this trading reflection. A crucial part of trading discipline is observing how your emotional state intersects with market execution. When reviewing this setup, what specific risk management rule or invalidation level gives you the greatest peace of mind?";
+  function generateContextualJournalResponse(message: string, history: any[] = [], persona: string = 'empathetic', systemPrompt?: string): string {
+    const text = (message || "").trim();
+    const p = (persona || 'empathetic').toLowerCase();
+
+    // Generate dynamic reflection tailored to the user's specific input and chosen persona
+    if (p.includes('analytical')) {
+      return `[Analytical Coach Mode] Analyzing your entry: "${text.slice(0, 80)}${text.length > 80 ? '...' : ''}". What is the primary operational constraint or assumption in this thought, and what specific metric or action will validate your next step?`;
     }
-    if (text.includes("anxious") || text.includes("stress") || text.includes("worried") || text.includes("fear") || text.includes("panic")) {
-      return "I hear the tension in your words. Acknowledging that anxiety directly is a major strength. Take a steady breath—what is one small, grounded step you can take right now to regain clarity and focus on what's within your control?";
+    if (p.includes('neutral')) {
+      return `[Neutral Listener Mode] You noted: "${text.slice(0, 80)}${text.length > 80 ? '...' : ''}". What specific aspect of this situation would you like to unpack further?`;
     }
-    if (text.includes("happy") || text.includes("excited") || text.includes("great") || text.includes("win") || text.includes("confident")) {
-      return "It's wonderful to feel that momentum and clarity! As you reflect on this positive moment, what specific choices, mindset, or preparation contributed most to this outcome that you'd like to reinforce?";
-    }
-    return "Thank you for taking the time to write down your thoughts. Journaling consistently is one of the most effective ways to build clarity and self-awareness. Looking back at what you just wrote, what stands out to you the most, and how would you like to navigate the rest of your day?";
+    return `[Empathetic Friend Mode] Reflecting on what you shared: "${text.slice(0, 80)}${text.length > 80 ? '...' : ''}". How is this thought feeling in your mind right now, and what kind of support or clarity would serve you best today?`;
   }
 
   const PSYCHOLOGY_ANALYST_SYSTEM_INSTRUCTION = `You are a Trading Psychology Analyst embedded in a trading journal app. Your job is to detect emotional/cognitive bias in real-time as a trader logs a trade idea, entry, or exit — BEFORE the trade executes — and flag when a cool-down period should be triggered.
@@ -2281,7 +2284,19 @@ ${task.suggestedApiEndpoints.map((ep: string) => `- \`${ep}\``).join('\n')}
 
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        return res.status(500).json({ error: "GEMINI_API_KEY is not configured" });
+        console.warn("[Lumina Server] GEMINI_API_KEY is not configured in .env. Returning keyword-based search fallback.");
+        const queryLower = (query || "").toLowerCase();
+        const matches = entries.filter((e: any) =>
+          (e.title && e.title.toLowerCase().includes(queryLower)) ||
+          (e.text && e.text.toLowerCase().includes(queryLower)) ||
+          (e.summary && e.summary.toLowerCase().includes(queryLower))
+        );
+        return res.json({
+          answer: matches.length > 0
+            ? `Found ${matches.length} matching journal reflection(s) for "${query}".`
+            : `No journal entries specifically matched "${query}". (Configure GEMINI_API_KEY in .env for generative semantic search).`,
+          relevantEntryIds: matches.slice(0, 5).map((m: any) => m.id)
+        });
       }
 
       const ai = new GoogleGenAI({ apiKey });
@@ -2313,16 +2328,24 @@ CRITICAL: Return ONLY valid JSON.
 ${entriesToProcess.map((e: any) => `[ID: ${e.id}]\nDate: ${e.date}\nTitle: ${e.title}\nSummary: ${e.summary}\nContent:\n${e.text}`).join('\n\n---\n\n')}
 `;
 
-      const result = await ai.models.generateContent({
-        model: "gemini-3.8-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          temperature: 0.2, // Low temperature for more factual retrieval
+      let responseText = "{}";
+      const askModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-3.8-flash", "gemini-flash-latest"];
+      for (const m of askModels) {
+        try {
+          const result = await ai.models.generateContent({
+            model: m,
+            contents: prompt,
+            config: {
+              responseMimeType: "application/json",
+              temperature: 0.2,
+            }
+          });
+          responseText = result.text || "{}";
+          break;
+        } catch (modelErr) {
+          console.warn(`[Ask Journal] Model ${m} unavailable, trying next...`, modelErr);
         }
-      });
-
-      const responseText = result.text || "{}";
+      }
       try {
         const parsed = JSON.parse(responseText.trim());
         res.json(parsed);
@@ -2339,17 +2362,23 @@ ${entriesToProcess.map((e: any) => `[ID: ${e.id}]\nDate: ${e.date}\nTitle: ${e.t
 
   app.post("/api/journal/chat", authenticateUser, async (req, res) => {
     try {
-      const { systemPrompt, message, history, mediaBase64, mediaMimeType } = req.body;
+      const { systemPrompt, persona, message, history, mediaBase64, mediaMimeType } = req.body;
+      const activePersonaName = persona || 'empathetic';
       
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
-        return res.status(500).json({ error: "GEMINI_API_KEY is not configured" });
+        console.warn(`[Lumina Server] GEMINI_API_KEY is not configured in .env. Returning contextual AI reflection fallback for persona "${activePersonaName}".`);
+        const fallbackText = generateContextualJournalResponse(message, history, activePersonaName, systemPrompt);
+        return res.json({ text: fallbackText });
       }
 
       const ai = new GoogleGenAI({ apiKey });
 
-      // Fallback model ladder
+      // Fallback model ladder for live Gemini endpoint
       const models = [
+        "gemini-2.5-flash",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
         "gemini-3.1-flash-lite",
         "gemini-flash-latest",
         "gemini-3.8-flash"
@@ -2387,7 +2416,7 @@ ${entriesToProcess.map((e: any) => `[ID: ${e.id}]\nDate: ${e.date}\nTitle: ${e.t
                 { role: 'user', parts: userParts }
               ],
               config: {
-                 systemInstruction: systemPrompt || "You are a helpful, empathetic journaling assistant.",
+                 systemInstruction: systemPrompt || `You are an insightful journaling mentor adopting the ${activePersonaName} persona.`,
                  temperature: 0.7,
               }
             });
@@ -2418,8 +2447,8 @@ ${entriesToProcess.map((e: any) => `[ID: ${e.id}]\nDate: ${e.date}\nTitle: ${e.t
       }
 
       if (!success) {
-        console.warn("All Gemini models failed or quota exceeded for chat; generating contextual response fallback.");
-        responseText = generateContextualJournalResponse(message, history);
+        console.warn(`All Gemini models failed or quota exceeded for chat; generating contextual response fallback for persona "${activePersonaName}".`);
+        responseText = generateContextualJournalResponse(message, history, activePersonaName, systemPrompt);
       }
 
       res.json({ text: responseText });

@@ -58,7 +58,13 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
   const [isEvaluatingTrade, setIsEvaluatingTrade] = useState(false);
   const [biasWarning, setBiasWarning] = useState<any>(null);
   const [hasPassedEvaluation, setHasPassedEvaluation] = useState(false);
-  const [activePersona, setActivePersona] = useState<AIPersona>('empathetic');
+  const [activePersona, setActivePersona] = useState<AIPersona>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('lumina_preferred_persona') as AIPersona;
+      if (saved && PERSONAS[saved]) return saved;
+    }
+    return 'analytical';
+  });
   const [showPersonaDropdown, setShowPersonaDropdown] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -616,14 +622,19 @@ Entry Notes: ${tradeNote}`
         },
         body: JSON.stringify({
           message: userMessage.content,
+          persona: activePersona,
           mediaBase64: currentMediaFile?.base64,
           mediaMimeType: currentMediaFile?.mimeType,
           history: journal.messages, // Only send previous history
-          systemPrompt: `You are an insightful journaling mentor. ${PERSONAS[activePersona].prompt}
-          Do NOT provide generic chatbot answers, platitudes, or simple validations. 
-          Analyze the user's reflection (and any attached media) and ask deep follow-up questions.
-          ${journal.location ? `The user is currently writing from: ${journal.location}. Consider this in context.` : ''} 
-          Keep your responses concise (1-2 paragraphs), focusing entirely on the follow-up question.`
+          systemPrompt: `You are an insightful journaling mentor acting strictly as the "${PERSONAS[activePersona].name}".
+Core Philosophy & Style: ${PERSONAS[activePersona].prompt}
+
+CRITICAL RULES:
+- Respond consistently in the distinctive style and tone of the "${PERSONAS[activePersona].name}".
+- Analyze the user's reflection (and any attached media) deeply and objectively.
+- Avoid generic platitudes. Provide focused, actionable, and perceptive mentorship.
+${journal.location ? `- The user is currently writing from: ${journal.location}. Consider this in context.` : ''} 
+- Keep your response concise (1-2 paragraphs), finishing with a thoughtful follow-up question.`
         })
       });
 
@@ -749,6 +760,9 @@ Entry Notes: ${tradeNote}`
                       key={persona.id}
                       onClick={() => {
                         setActivePersona(persona.id);
+                        if (typeof window !== 'undefined') {
+                          localStorage.setItem('lumina_preferred_persona', persona.id);
+                        }
                         setShowPersonaDropdown(false);
                       }}
                       className={`w-full text-left p-3 rounded-lg mb-1 last:mb-0 transition-colors ${
