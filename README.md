@@ -75,8 +75,57 @@ gcloud run deploy ai-journal \
 ### 5. Required Campaign Labeling (Cloud Run AI Challenge)
 Apply the mandatory resource label to register the service for automated challenge verification:
 
+## 🚀 Installation & Setup
+
+Get Lumina up and running locally in under 2 minutes. Follow these simple steps:
+
+### 1. Clone the Repository
+```bash
+git clone [https://github.com/your-username/lumina-journal.git](https://github.com/your-username/lumina-journal.git)
+cd lumina-journal
 ```bash
 gcloud run services update ai-journal \
   --update-labels=dev-tutorial=cloud-run-ai-challenge \
   --region=us-central1
 ```
+2. Install Dependencies
+Make sure you have Node.js (v18+) installed, then run:
+npm install
+
+3. Configure Environment Variables
+Create a .env file in the root directory of your project and add your Google Gemini API key:
+VITE_GEMINI_API_KEY=your_gemini_api_key_here
+
+4. Run the Development Server
+Start the local Vite dev server:
+npm run dev
+
+5. Access the Dashboard
+Open your web browser and navigate to:
+👉 http://localhost:3000
+
+## ☁️ Deployment Guide (Cloud Run)
+
+Deploying Lumina to Google Cloud Run ensures enterprise-grade hosting with auto-scaling and serverless reliability. 
+
+### 1. Build the Production Bundle
+Compile your React application for production:
+```bash
+npm run build
+````
+
+2. Containerize with Docker
+Ensure your project contains a standard Dockerfile, then build and submit the container image to Google Artifact Registry / Container Registry:
+gcloud builds submit --tag gcr.io/your-project-id/lumina-journal
+
+3. Deploy to Cloud Run
+Deploy the containerized service to your preferred region (e.g., us-central1):
+gcloud run deploy lumina-journal \
+  --image gcr.io/your-project-id/lumina-journal \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --set-env-vars VITE_GEMINI_API_KEY=your_gemini_api_key_here
+
+4. Verify Live Endpoint
+Once deployment completes, Cloud Run will output a secure public URL (e.g., https://lumina-journal-xyz-uc.a.run.app). Open this link in your browser to experience the live production deployment.
