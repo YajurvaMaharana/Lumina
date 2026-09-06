@@ -110,8 +110,8 @@ void main() {
     float coverage = clamp(auroraAlpha * (0.6 + 0.4 * energy), 0.0, 1.0);
     // Soft luminous bright base (#fafbff)
     vec3 lightBg = vec3(0.982, 0.985, 0.992);
-    // Gracefully mix the soft pastel rampColor (#E2D9F3, #C7F3E2, #F3D9E9) to keep fluid waves bright and visible
-    fragColor = vec4(mix(lightBg, rampColor, coverage * 0.88), 1.0);
+    // Mix rich jewel mid-tone rampColor (#9D7BE8, #5CD6A6, #E87BAE) so fluid waves stand out clearly without being washed out
+    fragColor = vec4(mix(lightBg, rampColor, coverage * 0.80), 1.0);
   } else {
     fragColor = vec4(auroraColor * auroraAlpha, auroraAlpha);
   }
@@ -131,9 +131,10 @@ export interface AuroraProps {
 
 export default function Aurora(props: AuroraProps) {
   const {
-    colorStops = props.lightMode ? ['#E2D9F3', '#C7F3E2', '#F3D9E9'] : ['#7c3aed', '#06b6d4', '#4338ca'],
-    amplitude = props.lightMode ? 0.8 : 1.0,
-    blend = 0.6,
+    colorStops = props.lightMode ? ['#9D7BE8', '#5CD6A6', '#E87BAE'] : ['#7c3aed', '#06b6d4', '#4338ca'],
+    amplitude = props.lightMode ? 0.9 : 1.0,
+    blend = props.lightMode ? 0.5 : 0.6,
+    speed = props.lightMode ? 0.5 : 0.4,
     lightMode = false,
     className = '',
     style

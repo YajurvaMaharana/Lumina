@@ -43,12 +43,12 @@ function AppContent() {
         <Aurora
           colorStops={
             theme === 'light'
-              ? ['#E2D9F3', '#C7F3E2', '#F3D9E9']
+              ? ['#9D7BE8', '#5CD6A6', '#E87BAE']
               : ['#7c3aed', '#06b6d4', '#4338ca']
           }
-          blend={0.6}
-          amplitude={theme === 'light' ? 0.8 : 1.0}
-          speed={0.4}
+          blend={theme === 'light' ? 0.5 : 0.6}
+          amplitude={theme === 'light' ? 0.9 : 1.0}
+          speed={theme === 'light' ? 0.5 : 0.4}
           lightMode={theme === 'light'}
         />
       </div>
