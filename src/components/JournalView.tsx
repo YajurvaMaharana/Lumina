@@ -73,6 +73,7 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const sessionInitializedIdRef = useRef<string | null>(null);
 
   // Active 15-minute countdown interval
   useEffect(() => {
@@ -232,6 +233,12 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
 
   useEffect(() => {
     if (journalId === 'new') {
+      // If already initialized for this new session and has active messages in state, prevent re-initialization
+      if (sessionInitializedIdRef.current === 'new' && journal && (journal.messages?.length || 0) > 0) {
+        return;
+      }
+      sessionInitializedIdRef.current = 'new';
+
       // Check for linked calendar event from sessionStorage
       let linkedEventId: string | undefined;
       let linkedEventSummary: string | undefined;
@@ -250,7 +257,7 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
 
       const newJournal: Journal = {
         id: crypto.randomUUID(),
-        userId: user!.uid,
+        userId: user?.uid || 'anonymous',
         title: linkedEventSummary ? `📅 ${linkedEventSummary}` : 'New Reflection',
         summary: '',
         createdAt: Date.now(),
@@ -266,6 +273,10 @@ export default function JournalView({ journalId, onBack }: { journalId: string |
         setInput(calendarPrompt);
       }
     } else {
+      if (sessionInitializedIdRef.current === journalId && journal && journal.id === journalId) {
+        return;
+      }
+      sessionInitializedIdRef.current = journalId;
       loadJournal();
     }
   }, [journalId]);
@@ -625,43 +636,59 @@ Entry Notes: ${tradeNote}`
     setIsTyping(true);
     setError(null);
 
-    // Save to Firestore optimistically
-    try {
-      setIsSaving(true);
-      await saveJournal(user.uid, updatedJournal);
-      setIsSaving(false);
-    } catch (err: any) {
-      console.error("Failed to save user message", err);
-      setError(err.message || "Failed to save message. Please check your connection.");
-      setIsSaving(false);
-      setIsTyping(false);
-      return; // Stop execution if encryption fails
+    // Save to Firestore optimistically if authenticated
+    if (user) {
+      try {
+        setIsSaving(true);
+        await saveJournal(user.uid, updatedJournal);
+        setIsSaving(false);
+      } catch (err: any) {
+        console.error("Failed to save user message", err);
+        setError(err.message || "Failed to save message. Please check your connection.");
+        setIsSaving(false);
+        setIsTyping(false);
+        return; // Stop execution if encryption fails
+      }
     }
 
     try {
-      const idToken = await user.getIdToken();
+      const idToken = user ? await user.getIdToken() : '';
       
+      const isInitialTurn = !journal || !journal.messages || journal.messages.length === 0;
+
+      const systemPrompt = isInitialTurn
+        ? `You are an insightful journaling mentor acting strictly as the "${PERSONAS[activePersona].name}".
+Core Philosophy & Style: ${PERSONAS[activePersona].prompt}
+
+CRITICAL RULES FOR OPENING REFLECTION:
+- Deliver an initial deep, perceptive reflection on the user's opening entry.
+- Respond consistently in the distinctive style and tone of the "${PERSONAS[activePersona].name}".
+- Avoid generic platitudes. Provide focused, actionable, and perceptive mentorship.
+${journal?.location ? `- The user is currently writing from: ${journal.location}. Consider this in context.` : ''} 
+- Keep your response concise (1-2 paragraphs), finishing with a thoughtful follow-up question.`
+        : `You are in an active ongoing mentoring dialogue acting strictly as the "${PERSONAS[activePersona].name}".
+Core Philosophy & Style: ${PERSONAS[activePersona].prompt}
+
+CRITICAL RULES FOR FOLLOW-UP REPLIES:
+- This is an active follow-up turn in an existing conversation. The initial greeting and reflection have ALREADY been delivered in prior turns.
+- DO NOT repeat the initial greeting, welcoming prompt, or introductory boilerplate.
+- Directly address the user's specific response in the context of the previous conversation history.
+- Dig deeper into their thoughts, challenge or validate their reasoning according to your persona, and advance the conversation with a focused, progressive follow-up question.
+- Keep your reply concise (1-2 paragraphs) and engaging.`;
+
       const response = await fetch('/api/journal/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
+          ...(idToken && { 'Authorization': `Bearer ${idToken}` })
         },
         body: JSON.stringify({
           message: userMessage.content,
           persona: activePersona,
           mediaBase64: currentMediaFile?.base64,
           mediaMimeType: currentMediaFile?.mimeType,
-          history: journal.messages, // Only send previous history
-          systemPrompt: `You are an insightful journaling mentor acting strictly as the "${PERSONAS[activePersona].name}".
-Core Philosophy & Style: ${PERSONAS[activePersona].prompt}
-
-CRITICAL RULES:
-- Respond consistently in the distinctive style and tone of the "${PERSONAS[activePersona].name}".
-- Analyze the user's reflection (and any attached media) deeply and objectively.
-- Avoid generic platitudes. Provide focused, actionable, and perceptive mentorship.
-${journal.location ? `- The user is currently writing from: ${journal.location}. Consider this in context.` : ''} 
-- Keep your response concise (1-2 paragraphs), finishing with a thoughtful follow-up question.`
+          history: journal?.messages || [], // Persistent full history prior to this turn
+          systemPrompt
         })
       });
 
@@ -679,24 +706,27 @@ ${journal.location ? `- The user is currently writing from: ${journal.location}.
       };
 
       const finalMessages = [...updatedMessages, aiMessage];
-      const finalJournal = {
+      const finalJournal: Journal = {
         ...updatedJournal,
+        title: newTitle || updatedJournal.title,
         messages: finalMessages,
-        // Update summary based on last few messages
         summary: "Contains " + finalMessages.length + " interactions."
       };
 
       setJournal(finalJournal);
-      
+
       // Save AI response to Firestore
-      setIsSaving(true);
-      try {
-        await saveJournal(user.uid, finalJournal);
-      } catch (err: any) {
-        console.error("Failed to save AI response", err);
-        setError(err.message || "Failed to save AI response.");
+      if (user) {
+        setIsSaving(true);
+        saveJournal(user.uid, finalJournal)
+          .catch((err: any) => {
+            console.error("Failed to save AI response", err);
+            setError(err.message || "Failed to save AI response.");
+          })
+          .finally(() => {
+            setIsSaving(false);
+          });
       }
-      setIsSaving(false);
 
       // Concurrently run Granular Emotion & CBT Analysis on original user reflection
       if (updatedMessages.length > 0) {

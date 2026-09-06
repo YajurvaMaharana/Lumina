@@ -97,15 +97,58 @@ async function startServer() {
   function generateContextualJournalResponse(message: string, history: any[] = [], persona: string = 'empathetic', systemPrompt?: string): string {
     const text = (message || "").trim();
     const p = (persona || 'empathetic').toLowerCase();
+    const cleanSnippet = text.length > 90 ? text.slice(0, 90).trim() + "..." : text;
 
-    // Generate dynamic reflection tailored to the user's specific input and chosen persona
+    // Filter user messages in history to determine turn number
+    const userHistory = (history || []).filter((m: any) => m.role === 'user');
+    const turnNumber = userHistory.length; // 0: initial journal entry, 1: 1st follow-up, 2: 2nd follow-up...
+
+    // Turn 0: Initial Journal Entry Reflection
+    if (turnNumber === 0) {
+      if (p.includes('analytical')) {
+        return `Analyzing your initial reflection: "${cleanSnippet}". Looking at the variables at play, what is the central assumption driving this situation, and what concrete metric or boundary will determine your next move?`;
+      }
+      if (p.includes('neutral')) {
+        return `You've noted: "${cleanSnippet}". Looking at these circumstances objectively, which dimension feels most urgent to explore first?`;
+      }
+      // Empathetic default
+      return `Thank you for putting this into words: "${cleanSnippet}". That carries real emotional weight. How has this been sitting with you throughout your day, and what kind of support or clarity feels most needed right now?`;
+    }
+
+    // Follow-up Turns (Turn 1+): DO NOT repeat the initial greeting or entry template!
+    // Turn 1: First follow-up reply
+    if (turnNumber === 1) {
+      if (p.includes('analytical')) {
+        return `That clarifies the framework behind your thinking. By identifying "${cleanSnippet}", you've highlighted a key leverage point. What is the biggest operational risk if you proceed with this approach, and how can you hedge against it?`;
+      }
+      if (p.includes('neutral')) {
+        return `Understood. In response to that point, you emphasized "${cleanSnippet}". How does this factor influence the other choices or people involved in this situation?`;
+      }
+      // Empathetic
+      return `I really hear what you're saying about "${cleanSnippet}". Acknowledging that takes clarity and courage. When you sit with that awareness, what feels like the gentlest, most honest next step for yourself?`;
+    }
+
+    // Turn 2: Second follow-up reply
+    if (turnNumber === 2) {
+      if (p.includes('analytical')) {
+        return `The logic here is becoming much more defined. Building on "${cleanSnippet}", let's stress-test this: if external conditions don't unfold as planned, what is your fallback protocol?`;
+      }
+      if (p.includes('neutral')) {
+        return `That adds important context. You've noted that "${cleanSnippet}". From an observer's perspective, what parts of this remain fully within your control versus outside of it?`;
+      }
+      // Empathetic
+      return `It sounds like you're untangling something really profound here. Sharing that "${cleanSnippet}" shows how much reflection you're putting into this. How does your body feel as you give voice to this thought?`;
+    }
+
+    // Turn 3+: Deep reflection & progressive synthesis
     if (p.includes('analytical')) {
-      return `[Analytical Coach Mode] Analyzing your entry: "${text.slice(0, 80)}${text.length > 80 ? '...' : ''}". What is the primary operational constraint or assumption in this thought, and what specific metric or action will validate your next step?`;
+      return `We've broken this down into actionable components: from your opening entry to your latest observation on "${cleanSnippet}". What single high-conviction decision or rule can you establish right now to solidify this learning?`;
     }
     if (p.includes('neutral')) {
-      return `[Neutral Listener Mode] You noted: "${text.slice(0, 80)}${text.length > 80 ? '...' : ''}". What specific aspect of this situation would you like to unpack further?`;
+      return `Synthesizing our exchange so far: you've examined the situation from multiple angles, leading to "${cleanSnippet}". How do you want to document or summarize this reflection before closing the session?`;
     }
-    return `[Empathetic Friend Mode] Reflecting on what you shared: "${text.slice(0, 80)}${text.length > 80 ? '...' : ''}". How is this thought feeling in your mind right now, and what kind of support or clarity would serve you best today?`;
+    // Empathetic
+    return `Looking back at where you started today versus what you just shared about "${cleanSnippet}", there is noticeable insight and resilience emerging. Be proud of taking the time to explore this deeply. What is one supportive thought you want to hold onto as you move into the rest of your day?`;
   }
 
   const PSYCHOLOGY_ANALYST_SYSTEM_INSTRUCTION = `You are a Trading Psychology Analyst embedded in a trading journal app. Your job is to detect emotional/cognitive bias in real-time as a trader logs a trade idea, entry, or exit — BEFORE the trade executes — and flag when a cool-down period should be triggered.
@@ -2385,9 +2428,8 @@ ${entriesToProcess.map((e: any) => `[ID: ${e.id}]\nDate: ${e.date}\nTitle: ${e.t
 
       // Fallback model ladder for live Gemini endpoint
       const models = [
-        "gemini-2.5-flash",
+        "gemini-3.6-flash",
         "gemini-2.0-flash",
-        "gemini-1.5-flash",
         "gemini-3.1-flash-lite",
         "gemini-flash-latest",
         "gemini-3.8-flash"
@@ -2396,6 +2438,12 @@ ${entriesToProcess.map((e: any) => `[ID: ${e.id}]\nDate: ${e.date}\nTitle: ${e.t
       let responseText = "";
       let success = false;
       let lastError = null;
+
+      const isInitialTurn = !history || history.length === 0;
+      const adaptiveSystemInstruction = systemPrompt || (isInitialTurn
+        ? `You are an insightful journaling mentor adopting the ${activePersonaName} persona. Provide an initial deep reflection on the user's opening entry, followed by a thought-provoking question.`
+        : `You are in an active ongoing mentoring dialogue with the user as the ${activePersonaName} persona. The initial greeting and reflection have already been delivered in prior turns. Do not repeat your initial greeting, welcoming prompt, or analyze the opening entry from scratch. Directly address the user's latest reply in the context of our prior exchange, explore their thoughts deeper, and ask a focused follow-up question.`
+      );
 
       for (const model of models) {
         let retries = 2;
@@ -2425,7 +2473,7 @@ ${entriesToProcess.map((e: any) => `[ID: ${e.id}]\nDate: ${e.date}\nTitle: ${e.t
                 { role: 'user', parts: userParts }
               ],
               config: {
-                 systemInstruction: systemPrompt || `You are an insightful journaling mentor adopting the ${activePersonaName} persona.`,
+                 systemInstruction: adaptiveSystemInstruction,
                  temperature: 0.7,
               }
             });
