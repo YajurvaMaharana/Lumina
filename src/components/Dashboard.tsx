@@ -49,23 +49,8 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
   const knownEntryIdsRef = useRef<Set<string>>(new Set());
   const isInitialPollRef = useRef<boolean>(true);
 
-  // Startup introduction animation state: 'splash' -> 'gliding' -> 'ready'
-  const [introPhase, setIntroPhase] = useState<'splash' | 'gliding' | 'ready'>('splash');
-
-  useEffect(() => {
-    const glideTimer = setTimeout(() => {
-      setIntroPhase('gliding');
-    }, 1200);
-
-    const readyTimer = setTimeout(() => {
-      setIntroPhase('ready');
-    }, 2300);
-
-    return () => {
-      clearTimeout(glideTimer);
-      clearTimeout(readyTimer);
-    };
-  }, []);
+  // Hover state for interactive expanding navigation items
+  const [hoveredTab, setHoveredTab] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -170,111 +155,152 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
     }).format(new Date(ts));
   };
 
-  // Navigation dock items (clean, minimalist icon-only buttons with tooltips)
+  // Navigation dock items with labels and interactive expanding styles
   const navItems = [
     {
       id: 'entries' as const,
-      label: `Reflections (${journals.length})`,
+      label: 'Reflections',
+      fullLabel: `My Reflections (${journals.length})`,
       icon: LayoutGrid,
-      activeClass: 'bg-violet-600 text-white shadow-lg shadow-violet-900/30 ring-1 ring-violet-400/40',
+      activeClass: 'bg-violet-600 text-white shadow-md shadow-violet-900/40 ring-1 ring-violet-400/50',
       iconColor: 'text-violet-400',
     },
     {
       id: 'agent' as const,
-      label: 'Autonomous Agent',
+      label: 'Agent',
+      fullLabel: 'Autonomous Agent',
       icon: Bot,
-      activeClass: 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30 ring-1 ring-indigo-400/40',
+      activeClass: 'bg-indigo-600 text-white shadow-md shadow-indigo-900/40 ring-1 ring-indigo-400/50',
       iconColor: 'text-indigo-400',
     },
     {
       id: 'pm' as const,
-      label: 'PM & GitHub Dispatcher',
+      label: 'PM Dispatcher',
+      fullLabel: 'PM & GitHub Dispatcher',
       icon: GitPullRequest,
-      activeClass: 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/30 ring-1 ring-cyan-400/40',
+      activeClass: 'bg-cyan-600 text-white shadow-md shadow-cyan-900/40 ring-1 ring-cyan-400/50',
       iconColor: 'text-cyan-400',
     },
     {
       id: 'visualizer' as const,
-      label: 'Artwork & Visualizations',
+      label: 'Visualizer',
+      fullLabel: 'Artwork & Visualizations',
       icon: Palette,
-      activeClass: 'bg-pink-600 text-white shadow-lg shadow-pink-900/30 ring-1 ring-pink-400/40',
+      activeClass: 'bg-pink-600 text-white shadow-md shadow-pink-900/40 ring-1 ring-pink-400/50',
       iconColor: 'text-pink-400',
     },
     {
       id: 'insights' as const,
-      label: 'Behavioral Patterns & CBT',
+      label: 'CBT Patterns',
+      fullLabel: 'Behavioral Patterns & CBT',
       icon: Brain,
-      activeClass: 'bg-purple-600 text-white shadow-lg shadow-purple-900/30 ring-1 ring-purple-400/40',
+      activeClass: 'bg-purple-600 text-white shadow-md shadow-purple-900/40 ring-1 ring-purple-400/50',
       iconColor: 'text-purple-400',
     },
     {
       id: 'sync' as const,
-      label: 'Cognitive Sync & Performance',
+      label: 'Cognitive Sync',
+      fullLabel: 'Cognitive Sync & Performance',
       icon: Activity,
-      activeClass: 'bg-emerald-600 text-white shadow-lg shadow-emerald-900/30 ring-1 ring-emerald-400/40',
+      activeClass: 'bg-emerald-600 text-white shadow-md shadow-emerald-900/40 ring-1 ring-emerald-400/50',
       iconColor: 'text-emerald-400',
     },
     {
       id: 'calendar' as const,
-      label: 'Google Calendar Integration',
+      label: 'Calendar',
+      fullLabel: 'Google Calendar Integration',
       icon: Calendar,
-      activeClass: 'bg-blue-600 text-white shadow-lg shadow-blue-900/30 ring-1 ring-blue-400/40',
+      activeClass: 'bg-blue-600 text-white shadow-md shadow-blue-900/40 ring-1 ring-blue-400/50',
       iconColor: 'text-blue-400',
     },
     {
       id: 'collaborative' as const,
-      label: 'Collaborative Journaling',
+      label: 'Collaboration',
+      fullLabel: 'Collaborative Journaling',
       icon: Users,
-      activeClass: 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-900/30 ring-1 ring-fuchsia-400/40',
+      activeClass: 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-md shadow-violet-900/40 ring-1 ring-fuchsia-400/50',
       iconColor: 'text-fuchsia-400',
     },
   ];
 
+  const currentNav = navItems.find((item) => item.id === activeTab) || navItems[0];
+
   return (
     <div className="w-full min-h-screen bg-transparent text-[var(--text-secondary)] font-sans relative overflow-x-hidden flex flex-col transition-colors duration-200">
       <div className="absolute inset-0 atmosphere pointer-events-none opacity-30"></div>
-
-      {/* Startup Introduction Flying Group Animation */}
-      {introPhase !== 'ready' && (
-        <div className="fixed inset-0 z-50 pointer-events-none">
-          {/* Dimmed backdrop during initial splash, fades out during glide */}
-          <div
-            className={`absolute inset-0 bg-[#05070A]/80 backdrop-blur-md transition-opacity duration-1000 ease-out ${
-              introPhase === 'splash' ? 'opacity-100' : 'opacity-0'
-            }`}
-          />
-
-          {/* Gliding Neural Orbit + Lumina branding group */}
-          <div
-            className={`fixed transition-all duration-1000 ease-[cubic-bezier(0.16,1,0.3,1)] h-20 flex items-center ${
-              introPhase === 'splash'
-                ? 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 scale-125'
-                : 'top-0 left-6 lg:left-10 translate-x-0 translate-y-0 scale-100'
-            }`}
-          >
-            <div className="flex items-center gap-3.5">
-              <NeuralOrbit size={38} />
-              <div>
-                <h1 className="text-xl font-semibold tracking-tight glow-text text-[var(--text-primary)]">
-                  Lumina
-                </h1>
-                {introPhase === 'splash' && (
-                  <p className="text-[10px] uppercase tracking-widest text-violet-400 font-mono animate-pulse">
-                    AI Cognitive Sync
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       
-      <header className="sticky top-0 z-30 h-20 w-full flex items-center justify-between px-6 lg:px-10 border-b border-[var(--border-color)] shrink-0 glass bg-[var(--header-glass-bg)]">
-        <div className={`flex items-center gap-3 transition-opacity duration-200 ${introPhase === 'ready' ? 'opacity-100' : 'opacity-0'}`}>
-          <NeuralOrbit size={38} />
-          <h1 className="text-xl font-semibold tracking-tight glow-text text-[var(--text-primary)]">Lumina</h1>
+      {/* Top Header with Unified Logo, Curved Expanding Navigation Bar, and Actions */}
+      <header className="sticky top-0 z-30 h-20 w-full flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-[var(--border-color)] shrink-0 glass bg-[var(--header-glass-bg)]">
+        {/* Left: Brand + Sleek Curved Fully Rounded Navigation Bar */}
+        <div className="flex items-center gap-3 sm:gap-5 min-w-0 flex-1 mr-2">
+          {/* Logo & Brand Name */}
+          <div
+            className="flex items-center gap-2.5 shrink-0 cursor-pointer group"
+            onClick={() => setActiveTab('entries')}
+            title="Lumina Home"
+          >
+            <NeuralOrbit size={36} />
+            <h1 className="text-xl font-semibold tracking-tight glow-text text-[var(--text-primary)] hidden md:inline">
+              Lumina
+            </h1>
+          </div>
+
+          {/* Sleek, curved, fully rounded glassmorphic navigation container */}
+          <nav
+            aria-label="Dashboard sections"
+            className="flex items-center gap-1 p-1 rounded-full bg-[var(--bg-card)]/85 backdrop-blur-xl border border-[var(--border-color)] shadow-inner overflow-x-auto no-scrollbar max-w-full"
+          >
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              const isHovered = hoveredTab === item.id;
+              const isExpanded = isActive || isHovered;
+
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActiveTab(item.id)}
+                  onMouseEnter={() => setHoveredTab(item.id)}
+                  onMouseLeave={() => setHoveredTab(null)}
+                  title={item.fullLabel}
+                  aria-label={item.fullLabel}
+                  className={`group relative shrink-0 flex items-center h-8 sm:h-9 px-2.5 rounded-full transition-all duration-300 ease-out cursor-pointer ${
+                    isActive
+                      ? `${item.activeClass} font-semibold`
+                      : isHovered
+                      ? 'bg-[var(--bg-card-hover)] text-[var(--text-primary)]'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  <Icon
+                    className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
+                      isActive ? 'text-white scale-105' : item.iconColor
+                    }`}
+                  />
+
+                  {/* Expanding Text Label on Active or Hover */}
+                  <div
+                    className={`overflow-hidden transition-all duration-300 ease-out whitespace-nowrap flex items-center ${
+                      isExpanded ? 'max-w-[140px] opacity-100 ml-1.5' : 'max-w-0 opacity-0 ml-0'
+                    }`}
+                  >
+                    <span className="text-xs tracking-tight select-none font-medium">
+                      {item.label}
+                    </span>
+                  </div>
+
+                  {/* Minimal indicator dot for active when unexpanded */}
+                  {isActive && !isExpanded && (
+                    <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white shadow-sm" />
+                  )}
+                </button>
+              );
+            })}
+          </nav>
         </div>
-        <div className="flex items-center gap-2.5 sm:gap-3.5">
+
+        {/* Right Header Quick Actions */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Ask Journal Quick Action */}
           <button
             onClick={() => setActiveTab('ask')}
@@ -295,7 +321,7 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
             title="Export Audit Trail (PDF, Markdown, JSON)"
           >
             <Download className="w-4 h-4 text-violet-500" />
-            <span className="hidden sm:inline">Export Audit Trail</span>
+            <span className="hidden lg:inline">Export Audit Trail</span>
           </button>
 
           {/* Theme Toggle Component */}
@@ -310,50 +336,36 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
         </div>
       </header>
 
-      <main className="w-full flex-1 px-4 sm:px-6 lg:px-10 py-10 relative z-10">
+      <main className="w-full flex-1 px-4 sm:px-6 lg:px-10 py-8 relative z-10">
         <div className="max-w-5xl w-full mx-auto space-y-8">
-          {/* Dashboard Header Bar with Icon-Only Navigation Dock */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <nav
-              aria-label="Dashboard sections"
-              className="flex items-center gap-1.5 bg-[var(--bg-card)]/90 backdrop-blur-md p-1.5 rounded-2xl border border-[var(--border-color)] self-start shadow-sm"
-            >
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = activeTab === item.id;
-                return (
-                  <div key={item.id} className="relative group">
-                    <button
-                      onClick={() => setActiveTab(item.id)}
-                      title={item.label}
-                      aria-label={item.label}
-                      className={`relative flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-xl transition-all duration-200 ${
-                        isActive
-                          ? `${item.activeClass} scale-105`
-                          : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)] hover:scale-105'
-                      }`}
-                    >
-                      <Icon className={`w-4 h-4 ${isActive ? 'text-white' : item.iconColor}`} />
-                      {isActive && (
-                        <span className="absolute -bottom-1 w-1.5 h-1.5 rounded-full bg-white shadow-sm" />
-                      )}
-                      {item.id === 'entries' && journals.length > 0 && !isActive && (
-                        <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-violet-400/70" />
-                      )}
-                    </button>
-
-                    {/* Clean Floating Tooltip */}
-                    <div className="absolute -top-9 left-1/2 -translate-x-1/2 px-2.5 py-1 bg-neutral-900/95 border border-white/10 text-white text-[11px] font-medium rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-all duration-200 whitespace-nowrap shadow-xl z-30 flex items-center gap-1.5">
-                      <span>{item.label}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </nav>
+          {/* Section Heading & New Entry Action Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[var(--border-subtle)]">
+            <div>
+              <h2 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
+                {currentNav.fullLabel}
+              </h2>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                {activeTab === 'entries'
+                  ? 'Review past cognitive reflections, emotional trajectories, and trading psychology logs.'
+                  : activeTab === 'agent'
+                  ? 'Autonomous reasoning engine synthesizing trends across your encrypted journal entries.'
+                  : activeTab === 'pm'
+                  ? 'Dev task extractor and automated GitHub issue dispatcher.'
+                  : activeTab === 'visualizer'
+                  ? 'AI-generated emotional landscape artwork reflecting your journaling themes.'
+                  : activeTab === 'insights'
+                  ? 'Cognitive Behavioral Therapy (CBT) distortion analysis and thinking reframes.'
+                  : activeTab === 'sync'
+                  ? 'Deep correlation analysis between emotional state and trade performance.'
+                  : activeTab === 'calendar'
+                  ? 'Bi-directional synchronization with your Google Calendar schedule.'
+                  : 'Encrypted collaborative reflections and shared accountability partner vault.'}
+              </p>
+            </div>
 
             <button
               onClick={() => onSelectJournal('new')}
-              className="flex items-center gap-2 bg-violet-600 text-white px-5 py-2.5 rounded-xl text-xs font-semibold hover:bg-violet-500 transition-all shadow-lg shadow-violet-900/30 hover:scale-[1.02] self-start sm:self-auto"
+              className="flex items-center gap-2 bg-violet-600 text-white px-5 py-2.5 rounded-xl text-xs font-semibold hover:bg-violet-500 transition-all shadow-lg shadow-violet-900/30 hover:scale-[1.02] self-start sm:self-auto shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>New Entry</span>

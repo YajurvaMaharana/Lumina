@@ -14,6 +14,7 @@ import PassphrasePrompt from './components/PassphrasePrompt';
 import { getPassword, clearPassword } from './lib/crypto';
 import { NeuralOrbitLoader } from './components/NeuralOrbit';
 import Aurora from './components/Aurora';
+import StartupIntro from './components/StartupIntro';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -34,6 +35,9 @@ function AppContent() {
 
   return (
     <div className="relative min-h-screen bg-[var(--bg-primary)] overflow-x-hidden">
+      {/* Global Startup Intro Splash Animation on Initial Boot across Login & Dashboard */}
+      <StartupIntro />
+
       {/* Full-viewport Aurora WebGL Background Layer */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
         <Aurora
