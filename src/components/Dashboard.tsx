@@ -153,10 +153,10 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
   };
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-secondary)] font-sans relative overflow-hidden flex flex-col transition-colors duration-200">
+    <div className="w-full min-h-screen bg-[var(--bg-primary)] text-[var(--text-secondary)] font-sans relative overflow-x-hidden flex flex-col transition-colors duration-200">
       <div className="absolute inset-0 atmosphere pointer-events-none"></div>
       
-      <header className="h-20 flex items-center justify-between px-6 lg:px-10 border-b border-[var(--border-color)] relative z-20 shrink-0 glass bg-[var(--header-glass-bg)]">
+      <header className="sticky top-0 z-30 h-20 w-full flex items-center justify-between px-6 lg:px-10 border-b border-[var(--border-color)] shrink-0 glass bg-[var(--header-glass-bg)]">
         <div className="flex items-center gap-3">
           <NeuralOrbit size={38} />
           <h1 className="text-xl font-semibold tracking-tight glow-text text-[var(--text-primary)]">Lumina</h1>
@@ -197,8 +197,8 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-10 py-10 relative z-10">
-        <div className="max-w-5xl mx-auto space-y-8">
+      <main className="w-full flex-1 px-4 sm:px-6 lg:px-10 py-10 relative z-10">
+        <div className="max-w-5xl w-full mx-auto space-y-8">
           {/* Dashboard Header Bar with View Switcher */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-2 bg-[var(--bg-card)] p-1 rounded-xl border border-[var(--border-color)] self-start shadow-sm">

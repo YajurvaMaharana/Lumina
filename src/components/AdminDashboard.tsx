@@ -58,7 +58,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[var(--bg-primary)] text-[var(--text-secondary)] font-sans relative overflow-hidden transition-colors duration-200">
+    <div className="flex flex-col h-screen w-full bg-[var(--bg-primary)] text-[var(--text-secondary)] font-sans relative overflow-x-hidden transition-colors duration-200">
       <div className="absolute inset-0 atmosphere pointer-events-none"></div>
       
       {/* Header */}
@@ -86,8 +86,8 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-hidden flex flex-col relative z-10 px-4 sm:px-10 reflection-mask">
-        <div className="max-w-4xl w-full mx-auto overflow-y-auto pt-10 pb-20 h-full scrollbar-hide">
+      <main className="flex-1 w-full overflow-y-auto overflow-x-hidden flex flex-col relative z-10 reflection-mask">
+        <div className="max-w-4xl w-full mx-auto pt-10 pb-20 px-4 sm:px-10">
           
           <div className="mb-10">
             <h3 className="serif text-3xl text-[var(--text-primary)] mb-2">Insights & Mood</h3>

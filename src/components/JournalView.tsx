@@ -782,7 +782,7 @@ ${journal.location ? `- The user is currently writing from: ${journal.location}.
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[var(--bg-primary)] text-[var(--text-secondary)] font-sans relative overflow-hidden transition-colors duration-200">
+    <div className="flex flex-col h-screen w-full bg-[var(--bg-primary)] text-[var(--text-secondary)] font-sans relative overflow-x-hidden transition-colors duration-200">
       <div className="absolute inset-0 atmosphere pointer-events-none"></div>
       
       {/* Header */}
@@ -922,8 +922,8 @@ ${journal.location ? `- The user is currently writing from: ${journal.location}.
       )}
 
       {/* Chat Area */}
-      <main className="flex-1 overflow-hidden flex flex-col relative z-10 px-4 sm:px-10">
-        <div className="max-w-3xl w-full mx-auto flex flex-col gap-10 overflow-y-auto pt-10 pb-4 h-full">
+      <main className="flex-1 w-full overflow-y-auto overflow-x-hidden flex flex-col relative z-10">
+        <div className="max-w-3xl w-full mx-auto flex flex-col gap-10 pt-10 pb-4 px-4 sm:px-10 h-full">
           {journal.messages.length === 0 ? (
             <div className="w-full flex flex-col items-center">
               <div className="flex gap-2 mb-8 bg-white/5 p-1 rounded-xl">
