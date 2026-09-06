@@ -12,7 +12,7 @@ import JournalView from './components/JournalView';
 import AdminDashboard from './components/AdminDashboard';
 import PassphrasePrompt from './components/PassphrasePrompt';
 import { getPassword, clearPassword } from './lib/crypto';
-import { Loader2 } from 'lucide-react';
+import { NeuralOrbitLoader } from './components/NeuralOrbit';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -32,7 +32,7 @@ function AppContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[var(--bg-primary)] text-[var(--text-secondary)]">
-        <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+        <NeuralOrbitLoader size={54} label="Initializing Lumina..." />
       </div>
     );
   }

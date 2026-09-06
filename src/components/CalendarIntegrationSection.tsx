@@ -11,12 +11,12 @@ import {
   MapPin,
   ExternalLink,
   AlertTriangle,
-  Loader2,
   BookOpen,
   XCircle,
   ChevronRight,
   Info
 } from 'lucide-react';
+import NeuralOrbit, { NeuralOrbitLoader } from './NeuralOrbit';
 import { useAuth } from '../lib/AuthContext';
 import { CalendarEvent, CalendarIntegrationSettings } from '../types';
 
@@ -299,7 +299,7 @@ export default function CalendarIntegrationSection({ onSelectJournal }: Calendar
                 </span>
               ) : isConnecting ? (
                 <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-wider">
-                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <NeuralOrbit size={14} speed="fast" glow={false} />
                   Connecting...
                 </span>
               ) : (
@@ -332,7 +332,7 @@ export default function CalendarIntegrationSection({ onSelectJournal }: Calendar
                   disabled={isFetchingEvents}
                   className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-semibold hover:bg-blue-500 transition-colors shadow-sm shadow-blue-900/20 disabled:opacity-50"
                 >
-                  {isFetchingEvents ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  {isFetchingEvents ? <NeuralOrbit size={16} speed="fast" glow={false} /> : <RefreshCw className="w-3.5 h-3.5" />}
                   Refresh Events
                 </button>
                 <button
@@ -354,7 +354,7 @@ export default function CalendarIntegrationSection({ onSelectJournal }: Calendar
                 disabled={isConnecting}
                 className="flex items-center gap-2.5 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-sm font-semibold hover:from-blue-500 hover:to-cyan-400 transition-all shadow-lg shadow-blue-900/25 disabled:opacity-50"
               >
-                {isConnecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                {isConnecting ? <NeuralOrbit size={18} speed="fast" glow={false} /> : <Link2 className="w-4 h-4" />}
                 Connect Google Calendar
               </button>
             </div>
@@ -383,9 +383,7 @@ export default function CalendarIntegrationSection({ onSelectJournal }: Calendar
           )}
 
           {isFetchingEvents && events.length === 0 ? (
-            <div className="flex items-center justify-center py-16 text-[var(--text-muted)]">
-              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-            </div>
+            <NeuralOrbitLoader size={44} label="Fetching Google Calendar events..." />
           ) : events.length === 0 && !eventsError ? (
             <div className="text-center py-12 glass rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]">
               <Calendar className="w-10 h-10 text-[var(--text-faint)] mx-auto mb-3" />
@@ -479,7 +477,7 @@ export default function CalendarIntegrationSection({ onSelectJournal }: Calendar
                 disabled={isDisconnecting}
                 className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-500 rounded-xl transition-colors shadow-sm shadow-red-900/20 disabled:opacity-50"
               >
-                {isDisconnecting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {isDisconnecting && <NeuralOrbit size={15} speed="fast" glow={false} />}
                 Disconnect & Revoke
               </button>
             </div>

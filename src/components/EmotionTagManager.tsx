@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Sparkles, Plus, X, Check, Edit2, AlertTriangle, HelpCircle, ThumbsUp, ThumbsDown, RefreshCw } from 'lucide-react';
+import NeuralOrbit from './NeuralOrbit';
 import { EmotionTag, CBTDistortion } from '../types';
 
 interface EmotionTagManagerProps {
@@ -151,7 +152,7 @@ export default function EmotionTagManager({
                 className="text-[11px] text-white/50 hover:text-white flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors disabled:opacity-50"
                 title="Re-run AI Emotion Analysis"
               >
-                <RefreshCw className={`w-3 h-3 ${isAnalyzing ? 'animate-spin text-violet-400' : ''}`} />
+                {isAnalyzing ? <NeuralOrbit size={14} speed="fast" glow={false} /> : <RefreshCw className="w-3 h-3" />}
                 <span>{isAnalyzing ? 'Analyzing...' : 'Re-scan Tone'}</span>
               </button>
             )}

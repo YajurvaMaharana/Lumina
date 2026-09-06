@@ -25,6 +25,7 @@ import {
   Zap,
   Bot
 } from 'lucide-react';
+import NeuralOrbit from './NeuralOrbit';
 import { useAuth } from '../lib/AuthContext';
 import { 
   getProjectManagementSettings, 
@@ -295,7 +296,7 @@ export default function ProjectManagementSection({ journals }: ProjectManagement
               disabled={isExtracting}
               className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-lg shadow-indigo-950 disabled:opacity-50"
             >
-              <Sparkles className={`w-4 h-4 ${isExtracting ? 'animate-spin' : ''}`} />
+              {isExtracting ? <NeuralOrbit size={16} speed="fast" glow={false} /> : <Sparkles className="w-4 h-4" />}
               <span>{isExtracting ? 'Extracting Action Items...' : 'Extract Dev Tasks from Log'}</span>
             </button>
           </div>
@@ -472,7 +473,7 @@ export default function ProjectManagementSection({ journals }: ProjectManagement
                           disabled={isDispatchingId === task.id}
                           className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
                         >
-                          <Send className={`w-3.5 h-3.5 ${isDispatchingId === task.id ? 'animate-spin' : ''}`} />
+                          {isDispatchingId === task.id ? <NeuralOrbit size={14} speed="fast" glow={false} /> : <Send className="w-3.5 h-3.5" />}
                           <span>{isDispatchingId === task.id ? 'Dispatching...' : 'Create GitHub Issue'}</span>
                         </button>
 

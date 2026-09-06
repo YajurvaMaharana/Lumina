@@ -26,6 +26,7 @@ import {
   Sliders,
   BellRing
 } from 'lucide-react';
+import NeuralOrbit from './NeuralOrbit';
 import { useAuth } from '../lib/AuthContext';
 import { 
   getAgentSettings, 
@@ -282,7 +283,7 @@ export default function AutonomousAgentSection({ journalsCount }: AutonomousAgen
               disabled={isRunningSynthesis}
               className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition-all shadow-lg shadow-indigo-950 disabled:opacity-50"
             >
-              <RefreshCw className={`w-4 h-4 ${isRunningSynthesis ? 'animate-spin' : ''}`} />
+              {isRunningSynthesis ? <NeuralOrbit size={16} speed="fast" glow={false} /> : <RefreshCw className="w-4 h-4" />}
               <span>{isRunningSynthesis ? 'Synthesizing...' : 'Run Autonomous Synthesis'}</span>
             </button>
 

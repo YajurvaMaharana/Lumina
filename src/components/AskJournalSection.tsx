@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Search, Loader2, Sparkles, AlertCircle, MessageSquareText, ChevronRight } from 'lucide-react';
+import { Search, Sparkles, AlertCircle, MessageSquareText, ChevronRight } from 'lucide-react';
+import NeuralOrbit, { NeuralOrbitLoader } from './NeuralOrbit';
 import { Journal } from '../types';
 import { auth } from '../lib/firebase';
 
@@ -109,11 +110,17 @@ export default function AskJournalSection({ journals, onSelectJournal }: AskJour
           <button
             type="submit"
             disabled={isSearching || !query.trim()}
-            className="absolute right-2 top-2 bottom-2 px-6 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-violet-900/20"
+            className="absolute right-2 top-2 bottom-2 px-6 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-violet-900/20 flex items-center justify-center min-w-[70px]"
           >
-            {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Ask'}
+            {isSearching ? <NeuralOrbit size={18} speed="fast" glow={false} /> : 'Ask'}
           </button>
         </form>
+
+        {isSearching && (
+          <div className="mt-8 py-6">
+            <NeuralOrbitLoader size={48} label="Synthesizing memories with Gemini AI..." />
+          </div>
+        )}
 
         {uniqueEmotions.length > 0 && !result && !isSearching && (
           <div className="mt-6">

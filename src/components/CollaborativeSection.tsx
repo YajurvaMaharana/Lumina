@@ -13,7 +13,6 @@ import {
   Sparkles,
   ShieldCheck,
   AlertCircle,
-  Loader2,
   Trash2,
   RefreshCw,
   Send,
@@ -26,6 +25,7 @@ import {
   BookOpen,
   KeyRound
 } from 'lucide-react';
+import NeuralOrbit, { NeuralOrbitLoader } from './NeuralOrbit';
 import { useAuth } from '../lib/AuthContext';
 import {
   CollaborationRole,
@@ -574,7 +574,7 @@ export default function CollaborativeSection({
 
           {loading ? (
             <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] py-2">
-              <Loader2 className="w-4 h-4 animate-spin text-violet-500" />
+              <NeuralOrbit size={16} speed="fast" glow={false} />
               Loading partners...
             </div>
           ) : connections.length === 0 ? (
@@ -691,9 +691,7 @@ export default function CollaborativeSection({
             </div>
 
             {loadingEntries ? (
-              <div className="flex items-center justify-center py-12 text-[var(--text-muted)]">
-                <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
-              </div>
+              <NeuralOrbitLoader size={44} label="Accessing collaborative reflection vault..." />
             ) : rawSharedEntries.length === 0 ? (
               <div className="glass rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] p-8 text-center">
                 <Share2 className="w-8 h-8 text-[var(--text-faint)] mx-auto mb-2" />
@@ -839,7 +837,7 @@ export default function CollaborativeSection({
                                 className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-500 text-white flex items-center gap-1.5 shadow-sm disabled:opacity-50 transition-all shrink-0"
                               >
                                 {isUnlocking[entry.id] ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  <NeuralOrbit size={15} speed="fast" glow={false} />
                                 ) : (
                                   <Unlock className="w-3.5 h-3.5" />
                                 )}
@@ -905,7 +903,7 @@ export default function CollaborativeSection({
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white shadow-sm disabled:opacity-50 transition-all"
               >
                 {isGeneratingPrompts ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <NeuralOrbit size={15} speed="fast" glow={false} />
                 ) : (
                   <Sparkles className="w-3 h-3" />
                 )}
@@ -993,7 +991,7 @@ export default function CollaborativeSection({
                               className="p-1.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-50 transition-colors"
                             >
                               {isSubmittingResponse[prompt.id] ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <NeuralOrbit size={15} speed="fast" glow={false} />
                               ) : (
                                 <Send className="w-3.5 h-3.5" />
                               )}
@@ -1093,7 +1091,7 @@ export default function CollaborativeSection({
                 disabled={isModalUnlocking}
                 className="px-4 py-2 text-xs font-semibold bg-violet-600 hover:bg-violet-500 text-white rounded-xl shadow-sm flex items-center gap-1.5 disabled:opacity-50"
               >
-                {isModalUnlocking ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unlock className="w-3.5 h-3.5" />}
+                {isModalUnlocking ? <NeuralOrbit size={16} speed="fast" glow={false} /> : <Unlock className="w-3.5 h-3.5" />}
                 Unlock Reflection
               </button>
             </div>
@@ -1183,7 +1181,7 @@ export default function CollaborativeSection({
                     disabled={isCreatingInvite}
                     className="px-4 py-2 text-xs font-semibold bg-violet-600 hover:bg-violet-500 text-white rounded-xl shadow-sm flex items-center gap-1.5 disabled:opacity-50"
                   >
-                    {isCreatingInvite && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    {isCreatingInvite && <NeuralOrbit size={15} speed="fast" glow={false} />}
                     Generate Invite Link
                   </button>
                 </div>
@@ -1301,7 +1299,7 @@ export default function CollaborativeSection({
                   disabled={isJoining}
                   className="px-4 py-2 text-xs font-semibold bg-violet-600 hover:bg-violet-500 text-white rounded-xl shadow-sm flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  {isJoining && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {isJoining && <NeuralOrbit size={15} speed="fast" glow={false} />}
                   Connect Partner
                 </button>
               </div>

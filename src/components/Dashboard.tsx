@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Plus, Book, LogOut, ChevronRight, Loader2, Sparkles, ShieldAlert, Brain, LayoutGrid, Activity, Palette, Bot, GitPullRequest, Trash2, AlertTriangle, Search, Calendar, Users, Share2, Lock, X, KeyRound, Bell, Download } from 'lucide-react';
+import { Plus, Book, LogOut, ChevronRight, Sparkles, ShieldAlert, Brain, LayoutGrid, Activity, Palette, Bot, GitPullRequest, Trash2, AlertTriangle, Search, Calendar, Users, Share2, Lock, X, KeyRound, Bell, Download } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { getJournals, fetchSharedEntries } from '../lib/db';
 import { db } from '../lib/firebase';
@@ -18,7 +18,7 @@ import ShareEntryModal from './ShareEntryModal';
 import ExportAuditTrailModal from './ExportAuditTrailModal';
 import ThemeToggle from './ThemeToggle';
 import ProfileDropdown from './ProfileDropdown';
-import NeuralOrbit from './NeuralOrbit';
+import NeuralOrbit, { NeuralOrbitLoader } from './NeuralOrbit';
 
 interface DashboardProps {
   onSelectJournal: (journalId: string | 'new') => void;
@@ -309,9 +309,7 @@ export default function Dashboard({ onSelectJournal, onOpenAdmin, onLockVault }:
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-20 text-[var(--text-muted)]">
-              <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
-            </div>
+            <NeuralOrbitLoader size={48} label="Synchronizing journal memories..." />
           ) : activeTab === 'ask' ? (
             <AskJournalSection journals={journals} onSelectJournal={(id) => onSelectJournal(id)} />
           ) : activeTab === 'agent' ? (

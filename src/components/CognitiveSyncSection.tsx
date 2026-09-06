@@ -21,6 +21,7 @@ import {
   BarChart3,
   Sliders
 } from 'lucide-react';
+import NeuralOrbit from './NeuralOrbit';
 import { useAuth } from '../lib/AuthContext';
 import { 
   getIntegrationSettings, 
@@ -419,7 +420,7 @@ export default function CognitiveSyncSection({ journalsCount }: CognitiveSyncSec
               disabled={isGeneratingReport}
               className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium bg-white/5 hover:bg-white/10 text-white/90 border border-white/10 transition-colors disabled:opacity-50"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isGeneratingReport ? 'animate-spin text-violet-400' : ''}`} />
+              {isGeneratingReport ? <NeuralOrbit size={14} speed="fast" glow={false} /> : <RefreshCw className="w-3.5 h-3.5" />}
               <span>{isGeneratingReport ? 'Correlating...' : 'Re-run Correlation Engine'}</span>
             </button>
             <button
@@ -751,7 +752,7 @@ export default function CognitiveSyncSection({ journalsCount }: CognitiveSyncSec
                   disabled={isSyncingGithub || !githubUsername.trim()}
                   className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold transition-colors disabled:opacity-50"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncingGithub ? 'animate-spin text-violet-400' : ''}`} />
+                  {isSyncingGithub ? <NeuralOrbit size={14} speed="fast" glow={false} /> : <RefreshCw className="w-3.5 h-3.5" />}
                   <span>{isSyncingGithub ? 'Connecting to GitHub...' : 'Sync Commits via REST v3'}</span>
                 </button>
               </div>
@@ -831,7 +832,7 @@ export default function CognitiveSyncSection({ journalsCount }: CognitiveSyncSec
                 disabled={isSeedingTrades}
                 className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-colors disabled:opacity-50"
               >
-                <Sparkles className={`w-3.5 h-3.5 ${isSeedingTrades ? 'animate-spin text-violet-400' : 'text-violet-400'}`} />
+                {isSeedingTrades ? <NeuralOrbit size={14} speed="fast" glow={false} /> : <Sparkles className="w-3.5 h-3.5 text-violet-400" />}
                 <span>{isSeedingTrades ? 'Populating...' : 'Seed Sample Trade History'}</span>
               </button>
               <button

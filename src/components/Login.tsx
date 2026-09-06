@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { loginWithGoogle, firebaseConfig } from '../lib/firebase';
-import { BookOpen, AlertTriangle, Loader2, RefreshCw, HelpCircle } from 'lucide-react';
+import { BookOpen, AlertTriangle, RefreshCw, HelpCircle } from 'lucide-react';
 import ThemeToggle from './ThemeToggle';
 import NeuralOrbit from './NeuralOrbit';
 import { useAuth } from '../lib/AuthContext';
@@ -126,7 +126,7 @@ export default function Login() {
             className="w-full flex items-center justify-center gap-3 bg-[var(--bg-card-hover)] border border-[var(--border-color)] hover:opacity-90 text-[var(--text-primary)] px-6 py-3 rounded-xl font-medium transition-all outline-none focus:ring-2 focus:ring-violet-500/40 text-sm shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
-              <Loader2 className="w-5 h-5 animate-spin text-violet-500" />
+              <NeuralOrbit size={20} speed="fast" glow={false} />
             ) : (
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path

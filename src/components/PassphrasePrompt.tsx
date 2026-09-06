@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { setPassword, encryptData, decryptData } from '../lib/crypto';
-import { Lock, AlertTriangle, KeyRound, ArrowLeft, Loader2, Key } from 'lucide-react';
+import { Lock, AlertTriangle, KeyRound, ArrowLeft, Key } from 'lucide-react';
+import NeuralOrbit, { NeuralOrbitLoader } from './NeuralOrbit';
 import { useAuth } from '../lib/AuthContext';
 import { db } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -145,7 +146,7 @@ export default function PassphrasePrompt({ onSet }: { onSet: () => void }) {
   if (mode === 'loading') {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[var(--bg-primary)] text-[var(--text-secondary)]">
-        <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+        <NeuralOrbitLoader size={54} label="Initializing cryptographic vault..." />
       </div>
     );
   }
@@ -231,7 +232,7 @@ export default function PassphrasePrompt({ onSet }: { onSet: () => void }) {
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" /> 
+                  <NeuralOrbit size={18} speed="fast" glow={false} className="mr-2" /> 
                   Recovering...
                 </>
               ) : (
@@ -334,7 +335,7 @@ export default function PassphrasePrompt({ onSet }: { onSet: () => void }) {
             disabled={isSubmitting}
             className="w-full bg-violet-600 hover:bg-violet-500 text-white font-medium py-3 rounded-xl transition-colors mt-2 flex justify-center items-center shadow-md shadow-violet-900/20 cursor-pointer"
           >
-            {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : (isSetup ? "Create Vault" : "Unlock Vault")}
+            {isSubmitting ? <NeuralOrbit size={20} speed="fast" glow={false} /> : (isSetup ? "Create Vault" : "Unlock Vault")}
           </button>
         </form>
 

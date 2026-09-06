@@ -6,7 +6,6 @@ import {
   Users,
   CheckCircle2,
   Shield,
-  Loader2,
   Heart,
   Target,
   Sparkles,
@@ -15,6 +14,7 @@ import {
   EyeOff,
   KeyRound
 } from 'lucide-react';
+import NeuralOrbit, { NeuralOrbitLoader } from './NeuralOrbit';
 import { useAuth } from '../lib/AuthContext';
 import { Journal, CollaborativeConnection } from '../types';
 import {
@@ -316,9 +316,7 @@ export default function ShareEntryModal({
 
           {/* Partner Selection List */}
           {loading ? (
-            <div className="flex items-center justify-center py-10 text-[var(--text-muted)]">
-              <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
-            </div>
+            <NeuralOrbitLoader size={40} label="Loading partners..." />
           ) : connections.length === 0 ? (
             <div className="text-center py-8 px-4 rounded-xl border border-dashed border-[var(--border-color)] bg-[var(--bg-card)]">
               <Users className="w-10 h-10 text-[var(--text-faint)] mx-auto mb-2" />
@@ -389,7 +387,7 @@ export default function ShareEntryModal({
                       } disabled:opacity-50`}
                     >
                       {isBusy ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <NeuralOrbit size={15} speed="fast" glow={false} />
                       ) : isShared ? (
                         'Revoke Share'
                       ) : (

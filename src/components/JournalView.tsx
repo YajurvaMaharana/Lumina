@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Send, Sparkles, Loader2, Save, Mic, MicOff, ShieldAlert, Palette, Paperclip, X, MapPin, ChevronDown, UserCog, Share2 } from 'lucide-react';
+import { ArrowLeft, Send, Sparkles, Save, Mic, MicOff, ShieldAlert, Palette, Paperclip, X, MapPin, ChevronDown, UserCog, Share2 } from 'lucide-react';
+import NeuralOrbit, { NeuralOrbitLoader } from './NeuralOrbit';
 import { useAuth } from '../lib/AuthContext';
 import { getJournal, saveJournal, extractTagsFromText, fetchCollaborativeConnections, publishSharedEntry } from '../lib/db';
 import { encryptWithShareKey, getPartnerKey } from '../lib/crypto';
@@ -775,7 +776,7 @@ ${journal.location ? `- The user is currently writing from: ${journal.location}.
   if (!journal) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[var(--bg-primary)] text-[var(--text-secondary)]">
-        <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+        <NeuralOrbitLoader size={52} label="Decrypting and opening journal session..." />
       </div>
     );
   }
@@ -890,7 +891,7 @@ ${journal.location ? `- The user is currently writing from: ${journal.location}.
           </button>
 
           <div className="flex items-center text-xs font-medium text-[var(--text-muted)] gap-1.5 bg-[var(--bg-card)] px-3 py-1.5 rounded-lg border border-[var(--border-color)]">
-            {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+            {isSaving ? <NeuralOrbit size={15} speed="fast" glow={false} /> : <Save className="w-3.5 h-3.5" />}
             {isSaving ? 'Saving...' : 'Saved'}
           </div>
         </div>
@@ -978,7 +979,7 @@ ${journal.location ? `- The user is currently writing from: ${journal.location}.
                     >
                       {isEvaluatingTrade ? (
                         <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <NeuralOrbit size={15} speed="fast" glow={false} />
                           <span>Evaluating Bias...</span>
                         </>
                       ) : coolDownTime > 0 ? (
@@ -1095,18 +1096,14 @@ ${journal.location ? `- The user is currently writing from: ${journal.location}.
           )}
 
           {isTyping && (
-            <div className="space-y-4 pt-4 border-t border-white/10 self-start w-full">
+            <div className="space-y-3 pt-4 border-t border-white/10 self-start w-full animate-fade-in">
               <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded-full bg-violet-500/20 border border-violet-500/40 flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 rounded-full bg-violet-400 shadow-[0_0_8px_#a78bfa]"></div>
-                </div>
+                <NeuralOrbit size={20} speed="fast" glow={false} />
                 <div className="text-[10px] uppercase tracking-widest text-violet-300 font-bold">Gemini Analysis</div>
               </div>
-              <div className="flex items-center gap-1.5 pt-2">
-                <div className="w-2 h-2 rounded-full bg-violet-400/50 animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 rounded-full bg-violet-400/50 animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 rounded-full bg-violet-400/50 animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
+              <p className="text-xs text-[var(--text-muted)] italic animate-pulse pl-7">
+                Reflecting on your journal thoughts...
+              </p>
             </div>
           )}
           {error && (
@@ -1153,7 +1150,7 @@ ${journal.location ? `- The user is currently writing from: ${journal.location}.
               }`}
               title="Attach media"
             >
-              {isCompressing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+              {isCompressing ? <NeuralOrbit size={16} speed="fast" glow={false} /> : <Paperclip className="w-4 h-4" />}
             </button>
             <button
               onClick={toggleRecording}
@@ -1178,7 +1175,7 @@ ${journal.location ? `- The user is currently writing from: ${journal.location}.
               }`}
               title={journal.location ? `Location attached: ${journal.location}` : "Auto-attach location data"}
             >
-              {isFetchingLocation ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+              {isFetchingLocation ? <NeuralOrbit size={16} speed="fast" glow={false} /> : <MapPin className="w-4 h-4" />}
             </button>
             <input
               type="text"
@@ -1195,7 +1192,7 @@ ${journal.location ? `- The user is currently writing from: ${journal.location}.
               title={coolDownTime > 0 ? `Cool-down active (${formatTime(coolDownTime)})` : "Send / Log Entry"}
             >
               {isEvaluatingTrade ? (
-                <Loader2 className="w-4 h-4 animate-spin text-white/70" />
+                <NeuralOrbit size={16} speed="fast" glow={false} />
               ) : (
                 <Send className="w-4 h-4 text-white" />
               )}

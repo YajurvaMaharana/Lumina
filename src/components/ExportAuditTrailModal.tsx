@@ -9,7 +9,6 @@ import {
   Unlock,
   CheckCircle2,
   AlertCircle,
-  Loader2,
   Sparkles,
   TrendingUp,
   ShieldCheck,
@@ -19,6 +18,7 @@ import {
   Layers,
   Check
 } from 'lucide-react';
+import NeuralOrbit from './NeuralOrbit';
 import { useAuth } from '../lib/AuthContext';
 import { Journal, TradeRecord } from '../types';
 import { getTrades } from '../lib/db';
@@ -429,7 +429,7 @@ export default function ExportAuditTrailModal({
             <div className="space-y-1.5 pt-1">
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-[var(--text-muted)] font-medium flex items-center gap-1.5">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-violet-500" />
+                  <NeuralOrbit size={16} speed="fast" glow={false} />
                   {exportStatus}
                 </span>
                 <span className="font-bold text-violet-600 dark:text-violet-400">
@@ -474,7 +474,7 @@ export default function ExportAuditTrailModal({
               className="px-4 py-2 text-xs font-semibold bg-violet-600 hover:bg-violet-500 text-white rounded-xl shadow-md flex items-center gap-1.5 disabled:opacity-50 transition-all"
             >
               {isExporting ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <NeuralOrbit size={15} speed="fast" glow={false} />
               ) : (
                 <Download className="w-3.5 h-3.5" />
               )}

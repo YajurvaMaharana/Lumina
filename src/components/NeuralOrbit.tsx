@@ -1,24 +1,33 @@
 import React from 'react';
 
-interface NeuralOrbitProps {
+export interface NeuralOrbitProps {
   size?: number;
   className?: string;
   glow?: boolean;
+  speed?: 'normal' | 'fast';
+  loader?: boolean;
+  label?: string;
 }
 
 export default function NeuralOrbit({
   size = 38,
   className = '',
-  glow = true
+  glow = true,
+  speed,
+  loader = false,
+  label
 }: NeuralOrbitProps) {
-  return (
+  const isFast = speed === 'fast' || loader;
+  const showGlow = glow && size >= 20;
+
+  const content = (
     <div
       className={`relative inline-flex items-center justify-center select-none group ${className}`}
       style={{ width: size, height: size }}
       title="Lumina Neural Orbit"
     >
       {/* Ambient background glow behind the logo */}
-      {glow && (
+      {showGlow && (
         <div
           className="absolute inset-0 rounded-full bg-gradient-to-tr from-violet-600/30 via-indigo-500/20 to-cyan-400/20 blur-md group-hover:blur-lg group-hover:opacity-100 opacity-75 transition-all duration-700 pointer-events-none"
           style={{ transform: 'scale(1.15)' }}
@@ -125,41 +134,41 @@ export default function NeuralOrbit({
 
           .orbit-carrier-ring {
             transform-origin: 26px 26px;
-            animation: neural-spin-slow 22s linear infinite;
+            animation: neural-spin-slow ${isFast ? '5s' : '22s'} linear infinite;
           }
           .orbit-carrier-ring-fast {
             transform-origin: 26px 26px;
-            animation: neural-spin-reverse 14s linear infinite;
+            animation: neural-spin-reverse ${isFast ? '3.5s' : '14s'} linear infinite;
           }
           .neural-wave-line {
             stroke-dasharray: 40 10;
-            animation: wave-pulse 6s ease-in-out infinite;
+            animation: wave-pulse ${isFast ? '2.5s' : '6s'} ease-in-out infinite;
           }
           .neural-wave-line-alt {
             stroke-dasharray: 30 15;
-            animation: wave-pulse-alt 5s ease-in-out infinite;
+            animation: wave-pulse-alt ${isFast ? '2s' : '5s'} ease-in-out infinite;
           }
           .crescent-halo {
-            animation: moon-halo-shimmer 4s ease-in-out infinite;
+            animation: moon-halo-shimmer ${isFast ? '2s' : '4s'} ease-in-out infinite;
           }
           .synapse-line {
-            animation: constellation-glow 3.5s ease-in-out infinite;
+            animation: constellation-glow ${isFast ? '1.8s' : '3.5s'} ease-in-out infinite;
           }
           .node-pulse-1 {
             transform-origin: 26px 26px;
-            animation: node-breathe 2.8s ease-in-out infinite;
+            animation: node-breathe ${isFast ? '1.4s' : '2.8s'} ease-in-out infinite;
           }
           .node-pulse-2 {
             transform-origin: 36px 17px;
-            animation: node-breathe 3.4s ease-in-out infinite 0.7s;
+            animation: node-breathe ${isFast ? '1.7s' : '3.4s'} ease-in-out infinite 0.4s;
           }
           .node-pulse-3 {
             transform-origin: 16px 35px;
-            animation: node-breathe 3.1s ease-in-out infinite 1.4s;
+            animation: node-breathe ${isFast ? '1.5s' : '3.1s'} ease-in-out infinite 0.7s;
           }
           .node-pulse-4 {
             transform-origin: 15px 17px;
-            animation: node-breathe 2.5s ease-in-out infinite 0.3s;
+            animation: node-breathe ${isFast ? '1.2s' : '2.5s'} ease-in-out infinite 0.2s;
           }
         `}</style>
 
@@ -300,4 +309,41 @@ export default function NeuralOrbit({
       </svg>
     </div>
   );
+
+  if (label) {
+    return (
+      <div className="flex flex-col items-center justify-center text-center">
+        {content}
+        <p className="mt-3 text-xs font-medium tracking-wide text-[var(--text-muted)] animate-pulse">
+          {label}
+        </p>
+      </div>
+    );
+  }
+
+  return content;
 }
+
+export function NeuralOrbitLoader({
+  size = 48,
+  label,
+  className = '',
+  speed = 'fast'
+}: {
+  size?: number;
+  label?: string;
+  className?: string;
+  speed?: 'normal' | 'fast';
+}) {
+  return (
+    <div className={`flex flex-col items-center justify-center p-6 text-center ${className}`}>
+      <NeuralOrbit size={size} speed={speed} loader glow={size >= 24} />
+      {label && (
+        <p className="mt-3.5 text-xs font-medium tracking-wider text-[var(--text-muted)] animate-pulse">
+          {label}
+        </p>
+      )}
+    </div>
+  );
+}
+

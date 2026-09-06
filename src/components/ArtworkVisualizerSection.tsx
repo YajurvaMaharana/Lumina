@@ -17,6 +17,7 @@ import {
   Activity,
   Award
 } from 'lucide-react';
+import NeuralOrbit from './NeuralOrbit';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -377,7 +378,7 @@ export default function ArtworkVisualizerSection({
                         title="Enhance with Pro AI Artwork Generation"
                       >
                         {isSynthesizingPro === j.id ? (
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-violet-400" />
+                          <NeuralOrbit size={14} speed="fast" glow={false} />
                         ) : (
                           <Zap className="w-3.5 h-3.5 text-amber-400" />
                         )}

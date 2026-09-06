@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, Loader2, TrendingUp, BarChart2, Calendar } from 'lucide-react';
+import { ArrowLeft, TrendingUp, BarChart2, Calendar } from 'lucide-react';
+import { NeuralOrbitLoader } from './NeuralOrbit';
 import { collection, query, orderBy, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import ThemeToggle from './ThemeToggle';
@@ -94,9 +95,7 @@ export default function AdminDashboard({ onBack }: AdminDashboardProps) {
           </div>
 
           {loading ? (
-            <div className="flex justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
-            </div>
+            <NeuralOrbitLoader size={48} label="Aggregating platform mood telemetry..." />
           ) : error ? (
             <div className="text-center bg-red-500/10 border border-red-500/20 rounded-2xl p-6">
               <p className="text-red-500 dark:text-red-400 text-sm font-medium">{error}</p>

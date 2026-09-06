@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Brain, Clock, Activity, Compass, AlertCircle, RefreshCw, ChevronDown, ChevronUp, ArrowRight, Lightbulb } from 'lucide-react';
+import NeuralOrbit, { NeuralOrbitLoader } from './NeuralOrbit';
 import { Journal, PatternInsight } from '../types';
 import { useAuth } from '../lib/AuthContext';
 
@@ -116,7 +117,7 @@ export default function PatternInsightsSection({ journals }: PatternInsightsSect
           disabled={loading}
           className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white/90 px-4 py-2.5 rounded-xl text-xs font-semibold border border-white/10 transition-all hover:border-violet-500/40 disabled:opacity-50 self-start sm:self-auto shrink-0 cursor-pointer"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-violet-400' : ''}`} />
+          {loading ? <NeuralOrbit size={15} speed="fast" glow={false} /> : <RefreshCw className="w-3.5 h-3.5" />}
           <span>{loading ? 'Scanning Entries...' : 'Deep Pattern Scan'}</span>
         </button>
       </div>
@@ -151,10 +152,7 @@ export default function PatternInsightsSection({ journals }: PatternInsightsSect
 
       {/* Pattern Cards List */}
       {loading ? (
-        <div className="p-12 text-center text-white/40 glass rounded-2xl border border-white/10 space-y-3">
-          <RefreshCw className="w-6 h-6 animate-spin mx-auto text-violet-400" />
-          <p className="text-sm">Analyzing cross-entry trends and cognitive behavioral patterns...</p>
-        </div>
+        <NeuralOrbitLoader size={48} label="Analyzing cross-entry trends and cognitive behavioral patterns..." />
       ) : filteredInsights.length === 0 ? (
         <div className="p-8 text-center text-white/40 glass rounded-2xl border border-white/10 space-y-2">
           <AlertCircle className="w-8 h-8 mx-auto text-white/20" />
