@@ -21,18 +21,25 @@ export default function DailyStreakBadge({ journals, userId, onOpenNewEntry }: D
     setStats(updated);
   }, [journals, userId]);
 
-  // Close dropdown on outside click
+  // Close dropdown on outside click or Escape key
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
       }
     }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setIsOpen(false);
+      }
+    }
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen]);
 
@@ -78,9 +85,24 @@ export default function DailyStreakBadge({ journals, userId, onOpenNewEntry }: D
         </span>
       </button>
 
-      {/* Interactive Popover Dropdown */}
+      {/* Click-Away Backdrop Blur Overlay */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-88 rounded-2xl glass border border-[var(--border-color)] shadow-2xl p-4 sm:p-5 z-50 animate-scale-up bg-white/95 dark:bg-[#0c1017]/95 backdrop-blur-2xl">
+        <div
+          className="fixed inset-0 z-40 bg-black/20 dark:bg-black/45 backdrop-blur-[2px] transition-opacity duration-200 cursor-default"
+          onClick={() => setIsOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Floating Interactive Streak Popover */}
+      {isOpen && (
+        <div
+          id="daily-streak-popover"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Daily Cognitive Streak Details"
+          className="absolute right-0 top-full mt-5 w-[calc(100vw-2rem)] sm:w-88 max-w-sm rounded-2xl glass border border-[var(--border-color)] shadow-2xl p-4 sm:p-5 z-50 animate-scale-up bg-white/95 dark:bg-[#0c1017]/95 backdrop-blur-2xl ring-1 ring-black/5 dark:ring-white/10"
+        >
           {/* Header */}
           <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">

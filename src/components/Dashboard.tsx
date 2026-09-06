@@ -309,7 +309,7 @@ export default function Dashboard({
       )}
       
       {/* Top Header with Unified Logo, Curved Expanding Navigation Bar, and Actions */}
-      <header className="sticky top-0 z-30 h-20 w-full flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-[var(--border-color)] shrink-0 glass bg-[var(--header-glass-bg)]">
+      <header className="sticky top-0 z-40 h-20 w-full flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-[var(--border-color)] shrink-0 glass bg-[var(--header-glass-bg)]">
         {/* Left: Brand + Sleek Curved Fully Rounded Navigation Bar */}
         <div className="flex items-center gap-3 sm:gap-5 min-w-0 flex-1 mr-2">
           {/* Logo & Brand Name */}
