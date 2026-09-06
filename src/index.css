@@ -27,13 +27,13 @@ html.light {
   --text-secondary: #334155;
   --text-muted: #475569;
   --text-faint: #64748b;
-  --border-color: rgba(15, 23, 42, 0.08);
-  --border-subtle: rgba(15, 23, 42, 0.04);
+  --border-color: rgba(203, 213, 225, 0.85); /* border-slate-300/85 */
+  --border-subtle: rgba(203, 213, 225, 0.60);
   --glow-color: rgba(124, 58, 237, 0.15);
   --atmosphere-1: #e0e7ff;
   --atmosphere-2: #ede9fe;
   --atmosphere-opacity: 0.55;
-  --header-glass-bg: rgba(255, 255, 255, 0.78);
+  --header-glass-bg: rgba(255, 255, 255, 0.82);
 }
 
 html {
@@ -130,34 +130,35 @@ html.light .glow-text {
   text-shadow: 0 0 12px rgba(124, 58, 237, 0.15);
 }
 
-/* 2. Frosted Liquid Glass Surfaces in Light Mode */
+/* 2. Frosted Liquid Glass Surfaces in Light Mode with Defined Border Contrast */
 html.light .glass {
-  background: rgba(255, 255, 255, 0.75) !important;
-  backdrop-filter: blur(24px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-  border: 1px solid rgba(15, 23, 42, 0.08) !important;
-  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05), inset 0 1px 1px 0 rgba(255, 255, 255, 0.9) !important;
-}
-
-html.light .glass:hover {
-  background: rgba(255, 255, 255, 0.90) !important;
-  border-color: rgba(15, 23, 42, 0.12) !important;
-  box-shadow: 0 12px 36px 0 rgba(31, 38, 135, 0.07), inset 0 1px 1px 0 rgba(255, 255, 255, 0.95) !important;
-}
-
-html.light header {
   background: rgba(255, 255, 255, 0.78) !important;
   backdrop-filter: blur(24px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-  border-bottom-color: rgba(15, 23, 42, 0.08) !important;
+  border: 1px solid rgba(203, 213, 225, 0.85) !important;
+  box-shadow: 0 8px 30px -4px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(124, 58, 237, 0.03), inset 0 1px 1px 0 rgba(255, 255, 255, 0.95) !important;
+}
+
+html.light .glass:hover {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(124, 58, 237, 0.40) !important;
+  box-shadow: 0 12px 36px -4px rgba(124, 58, 237, 0.08), 0 4px 12px -2px rgba(15, 23, 42, 0.06), inset 0 1px 1px 0 rgba(255, 255, 255, 1) !important;
+}
+
+html.light header {
+  background: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-bottom: 1px solid rgba(203, 213, 225, 0.85) !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.03), 0 4px 12px -2px rgba(124, 58, 237, 0.02) !important;
 }
 
 html.light nav[aria-label="Dashboard sections"] {
-  background: rgba(255, 255, 255, 0.75) !important;
+  background: rgba(255, 255, 255, 0.82) !important;
   backdrop-filter: blur(20px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border-color: rgba(15, 23, 42, 0.09) !important;
-  box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.05), inset 0 1px 1px 0 rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(203, 213, 225, 0.90) !important;
+  box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.06), 0 1px 3px 0 rgba(124, 58, 237, 0.05), inset 0 1px 1px 0 rgba(255, 255, 255, 0.95) !important;
 }
 
 html.light nav[aria-label="Dashboard sections"] button:not(.bg-violet-600):not(.bg-indigo-600):not(.bg-cyan-600):not(.bg-pink-600):not(.bg-purple-600):not(.bg-emerald-600):not(.bg-blue-600):not([class*="bg-gradient-"]) {
@@ -174,10 +175,10 @@ html.light .bg-\[\#0B0F19\],
 html.light .bg-\[\#05070D\],
 html.light .bg-\[\#05070E\],
 html.light .bg-\[\#0c1017\] {
-  background-color: rgba(255, 255, 255, 0.82) !important;
+  background-color: rgba(255, 255, 255, 0.85) !important;
   backdrop-filter: blur(24px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
-  border-color: rgba(15, 23, 42, 0.09) !important;
+  border: 1px solid rgba(203, 213, 225, 0.85) !important;
   color: #1e293b !important;
   box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.06), inset 0 1px 1px rgba(255, 255, 255, 0.9) !important;
 }
@@ -186,9 +187,9 @@ html.light .bg-black\/30,
 html.light .bg-black\/40,
 html.light .bg-black\/50,
 html.light .bg-black\/60 {
-  background-color: rgba(255, 255, 255, 0.8) !important;
+  background-color: rgba(255, 255, 255, 0.85) !important;
   backdrop-filter: blur(20px) !important;
-  border-color: rgba(15, 23, 42, 0.09) !important;
+  border: 1px solid rgba(203, 213, 225, 0.80) !important;
   color: #1e293b !important;
 }
 
@@ -197,30 +198,30 @@ html.light .bg-black\/80 {
   backdrop-filter: blur(12px) !important;
 }
 
-/* 3. Subtle Frosted Glass & Surface Card Backgrounds */
+/* 3. Subtle Frosted Glass & Surface Card Backgrounds with Defined Borders */
 html.light .bg-white\/\[0\.01\],
 html.light .bg-white\/\[0\.02\],
 html.light .bg-white\/\[0\.03\],
 html.light .bg-white\/\[0\.04\],
 html.light .bg-white\/\[0\.05\],
 html.light .bg-white\/\[0\.06\] {
-  background-color: rgba(255, 255, 255, 0.72) !important;
+  background-color: rgba(255, 255, 255, 0.75) !important;
   backdrop-filter: blur(16px) saturate(160%) !important;
   -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
-  border-color: rgba(15, 23, 42, 0.08) !important;
+  border: 1px solid rgba(203, 213, 225, 0.80) !important;
   box-shadow: 0 4px 16px -2px rgba(15, 23, 42, 0.04), inset 0 1px 1px 0 rgba(255, 255, 255, 0.85) !important;
   color: #1e293b !important;
 }
 
 html.light .bg-white\/5 {
-  background-color: rgba(255, 255, 255, 0.65) !important;
-  border-color: rgba(15, 23, 42, 0.08) !important;
+  background-color: rgba(255, 255, 255, 0.70) !important;
+  border: 1px solid rgba(203, 213, 225, 0.80) !important;
   color: #1e293b !important;
 }
 
 html.light .bg-white\/10 {
-  background-color: rgba(255, 255, 255, 0.85) !important;
-  border-color: rgba(15, 23, 42, 0.1) !important;
+  background-color: rgba(255, 255, 255, 0.88) !important;
+  border: 1px solid rgba(203, 213, 225, 0.85) !important;
   color: #1e293b !important;
 }
 
@@ -231,11 +232,51 @@ html.light .hover\:bg-white\/\[0\.04\]:hover {
   background-color: rgba(255, 255, 255, 0.95) !important;
 }
 
+/* 4. Defined Border Contrast for Container Borders and Card Wrappers */
 html.light .border-white\/5,
 html.light .border-white\/10,
 html.light .border-white\/15,
-html.light .border-white\/20 {
-  border-color: rgba(15, 23, 42, 0.08) !important;
+html.light .border-white\/20,
+html.light .border-slate-800,
+html.light .border-slate-700 {
+  border-color: rgba(203, 213, 225, 0.85) !important;
+}
+
+/* Deep purple-tinted borders for accent containers, cards and active boundaries */
+html.light .border-violet-500\/20,
+html.light .border-violet-500\/30,
+html.light .border-violet-500\/40,
+html.light .border-purple-500\/20,
+html.light .border-purple-500\/30,
+html.light .border-indigo-500\/20,
+html.light .border-indigo-500\/30 {
+  border-color: rgba(124, 58, 237, 0.30) !important;
+}
+
+/* Card wrappers and container edge clarity */
+html.light .group > .glass,
+html.light button.glass,
+html.light [class*="rounded-2xl"][class*="border"],
+html.light [class*="rounded-3xl"][class*="border"] {
+  border-color: rgba(203, 213, 225, 0.85);
+}
+
+html.light .group:hover > .glass,
+html.light button.glass:hover {
+  border-color: rgba(124, 58, 237, 0.42) !important;
+}
+
+/* Aurora Dynamic Background Edge Framing */
+.aurora-edge-frame {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 120px rgba(5, 7, 10, 0.45);
+}
+
+html.light .aurora-edge-frame {
+  background: radial-gradient(ellipse at 50% 48%, transparent 58%, rgba(241, 245, 249, 0.40) 84%, rgba(203, 213, 225, 0.48) 100%);
+  box-shadow: inset 0 0 90px rgba(148, 163, 184, 0.20), inset 0 0 0 1px rgba(203, 213, 225, 0.75);
 }
 
 /* 4. Autonomous Agent Orchestrator Header & Gradient Surfaces in Light Mode */

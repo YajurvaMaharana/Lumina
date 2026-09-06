@@ -51,6 +51,8 @@ function AppContent() {
           speed={theme === 'light' ? 0.5 : 0.4}
           lightMode={theme === 'light'}
         />
+        {/* Dynamic Aurora edge definition frame */}
+        <div className="aurora-edge-frame absolute inset-0 pointer-events-none" />
       </div>
 
       {/* Main Interactive Views Layer */}
